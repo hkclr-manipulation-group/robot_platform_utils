@@ -20,7 +20,7 @@ The CMake file in `cpp/CMakeLists.txt` defines:
 - Optional Python module build with `-DBUILD_PYTHON_LIB=ON`
 - Optional C++ tests with `-DBUILD_CPP_TESTS=ON`
 
-## How Another Repo Uses `add_subdirectory`
+## How Other Repos Use This Repo via `add_subdirectory`
 
 From a parent project CMake, include this repo's CMake directory and link against
 `robot::platform_utils` (or `robot_platform_utils`):
