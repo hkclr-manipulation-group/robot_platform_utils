@@ -1,0 +1,114 @@
+#ifndef CUARM_TCP_H
+#define CUARM_TCP_H
+
+#include <iostream>
+#include <memory>
+
+#include "cuarm_state.h"
+#include "curi_tcp.h"
+#include "cuarm_message_handler.h"
+
+template <typename UnpackT, typename PackT>
+class CuarmTcp{
+    public:
+        CuarmTcp(char server_ip[], int server_port, bool is_server,
+            void (*unpack_func)(UnpackT*, char*) = nullptr,
+            void (*pack_func)(PackT*, char*, int) = nullptr, 
+            int buffer_size=4096);
+        ~CuarmTcp();
+        void send(PackT* data);
+        int  receive(UnpackT* data, int timeout_usec);
+        bool server_has_client();
+        bool server_wait_client(int timeout_usec);
+        void close();
+
+    private:
+        void (*pack_function_)(PackT*, char*, int) = nullptr;
+        void (*unpack_function_)(UnpackT*, char*) = nullptr;
+        std::unique_ptr<tcp_node> tcp_node_ptr_;
+        int buffer_size_;
+        bool is_server_;
+};
+
+template <typename UnpackT, typename PackT>
+CuarmTcp<UnpackT, PackT>::CuarmTcp(char server_ip[], int server_port, bool is_server,
+    void (*unpack_func)(UnpackT*, char*),
+    void (*pack_func)(PackT*, char*, int), 
+    int buffer_size){
+    buffer_size_ = buffer_size;
+    tcp_node_ptr_ = std::make_unique<tcp_node>();
+    pack_function_ = pack_func;
+    unpack_function_ = unpack_func;
+    is_server_ = is_server;
+    
+    //Initialize TCP node and Sockets
+    int ret = tcp_init(tcp_node_ptr_.get(), server_ip, server_port, buffer_size_, is_server);
+    if (ret != 0){
+        if (is_server){
+            throw std::runtime_error("Failed to initialize TCP server, return code: " + std::to_string(ret));
+        }else{
+            throw std::runtime_error("TCP Connection Failed, return code: " + std::to_string(ret));
+        }
+    }
+}
+
+template <typename UnpackT, typename PackT>
+CuarmTcp<UnpackT, PackT>::~CuarmTcp(){
+    close();
+}
+
+template <typename UnpackT, typename PackT>
+void CuarmTcp<UnpackT, PackT>::send(PackT* data){
+    if (!pack_function_) {
+        throw std::runtime_error("TCP Pack function is not defined.");
+    }
+    
+    pack_function_(data, tcp_node_ptr_->send_buffer, buffer_size_);
+    tcp_send(tcp_node_ptr_.get(), buffer_size_);
+}
+
+template <typename UnpackT, typename PackT>
+int CuarmTcp<UnpackT, PackT>::receive(UnpackT* data, int timeout_usec){
+    if (!unpack_function_) {
+        throw std::runtime_error("TCP Unpack function is not defined.");
+    }
+
+    int bytes = tcp_select(tcp_node_ptr_.get(), timeout_usec, buffer_size_);
+    if (bytes > 0) {
+        unpack_function_(data, tcp_node_ptr_->receive_buffer);
+        return 0;
+    }else if (bytes != -4){ // -4 is timeout
+        if (is_server_) {
+            // std::cout << "TCP Client disconnected. Available for new client..." << std::endl;
+            tcp_server_clear_client(tcp_node_ptr_.get());
+            return -1;
+        }else{
+            throw std::runtime_error("TCP Connection lost.");
+        }
+    }
+    return 1; //Receive timeout
+}
+
+template <typename UnpackT, typename PackT>
+bool CuarmTcp<UnpackT, PackT>::server_has_client(){
+    return tcp_server_has_client(tcp_node_ptr_.get()) == 1;
+}
+
+template <typename UnpackT, typename PackT>
+bool CuarmTcp<UnpackT, PackT>::server_wait_client(int timeout_usec){
+    int ret = tcp_server_wait_client(tcp_node_ptr_.get(), timeout_usec, buffer_size_);
+    if (ret < 0) {
+        throw std::runtime_error("TCP Error waiting for client: " + std::to_string(ret));
+    }else if (ret == 0){
+        // std::cout << "TCP Client connected." << std::endl;
+        return true;
+    }
+    return false; //Timeout
+}
+
+template <typename UnpackT, typename PackT>
+void CuarmTcp<UnpackT, PackT>::close(){
+    tcp_close(tcp_node_ptr_.get());
+}
+
+#endif //CUARM_UDP_H
