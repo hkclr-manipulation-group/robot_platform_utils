@@ -40,10 +40,9 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
         add_subdirectory("${PARENT_REPO_DIR}/curi_tcp/c" "${CMAKE_BINARY_DIR}/curi_tcp")
     endif()
 
-    # Explicit file list (Fixes file(GLOB) tracking issues)
+    file(GLOB LIB_SOURCES "src/*.cpp")
     set(LIB_SOURCES
-        src/config_loader.cpp
-        # Add your other explicit C++ source files here
+        ${LIB_SOURCES}
     )
 
     add_library(robot_platform_utils ${LIB_SOURCES})
@@ -61,6 +60,7 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
     target_include_directories(robot_platform_utils PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
+    message("-----------------------------target_include_directories: ${CMAKE_CURRENT_SOURCE_DIR}/include")
 endif()
 
 
