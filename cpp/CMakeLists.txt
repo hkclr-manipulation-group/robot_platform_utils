@@ -26,18 +26,18 @@ option(BUILD_CPP_TESTS "Build C++ Test Infrastructure" OFF)
 ################################### Core Library Target ###########################################
 if(BUILD_LIB OR BUILD_CPP_TESTS)
     message(STATUS "Configuring Library: robot_platform_utils")
+    cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH PARENT_DIR)
+    cmake_path(GET PARENT_DIR PARENT_PATH PARENT_PARENT_DIR)
     
     find_package(yaml-cpp REQUIRED)
 
     # Cleaned-up sibling repository lookups using fallback search paths
     if(NOT TARGET curi::udp)
-        set(PARENT_REPO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../")
-        add_subdirectory("${PARENT_REPO_DIR}/curi_udp/c" "${CMAKE_BINARY_DIR}/curi_udp")
+        add_subdirectory("${PARENT_PARENT_DIR}/curi_udp/c" "${CMAKE_BINARY_DIR}/curi_udp")
     endif()
 
     if(NOT TARGET curi::tcp)
-        set(PARENT_REPO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../")
-        add_subdirectory("${PARENT_REPO_DIR}/curi_tcp/c" "${CMAKE_BINARY_DIR}/curi_tcp")
+        add_subdirectory("${PARENT_PARENT_DIR}/curi_tcp/c" "${CMAKE_BINARY_DIR}/curi_tcp")
     endif()
 
     file(GLOB LIB_SOURCES "src/*.cpp")
