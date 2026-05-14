@@ -60,7 +60,6 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
     target_include_directories(robot_platform_utils PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
-    message("-----------------------------target_include_directories: ${CMAKE_CURRENT_SOURCE_DIR}/include")
 endif()
 
 
