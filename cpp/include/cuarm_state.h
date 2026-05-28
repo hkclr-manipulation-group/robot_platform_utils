@@ -11,13 +11,13 @@
 // extern "C" 
 // {
 // #endif
-enum class MotionControl{kJoint, kNull, kTask, kMotor};
+enum class MotionControl{kJoint, kNull, kTask, kMotor, kTaskLine, kJointJog, kTaskJog, kTaskLineJog, kControlAlgorithm, kTeach, kReplay};
 enum OrientControl{kEnd, kBase};
 enum InterpolationMethod{kLinear, kCos, kCubic, kQuintic, kNone, kQuinticPath};
-enum class InterpolationMotionPhase{kInitialized, kAcceleration, kConstantVelocity, kDeceleration, kFinished};
+enum class InterpolationMotionPhase{kInitialized, kAcceleration, kConstantVelocity, kDeceleration, kFinished, kInterrupted};
 enum class ControlType{kInvalid=-1, kPosition, kVelocity, kTorque};
 enum class CameraMode{kCapturing, kStreaming};
-enum class ForceControlMode{
+enum class ControlAlgorithm{
     kNone=0,
     kGravity,
     kGravityWithBoundary,
@@ -29,39 +29,68 @@ enum class ForceControlMode{
 };
 enum class PanelRemoteState{kStop, kStart};
 enum class PanelTargetMode{kSinglePoint, kWaypoint, kRawSinglePoint};
-
 enum ComponentType{kArm, kGripper};
-
 enum ConnectionState{kWaiting, kRemote, kShutDown};
-enum class PlannerMode{
-    kPosPos = 0,
-    kPosVel,
-    kPosTor,
-    kVelVel,
-    kVelTor,
-    kTorTor,
-    kGravity,
-    kGravityWithBoundary,
-    kTaskAdmittance,
-    kJointAdmittance,
-    kTaskImpedance,
-    kJointImpedance,
-    kNullAdmittance,
+
+//operational state
+enum class SystemState{
+    kStartup    = 0,
+    kIdle       = 1, // Completely stationary; safe to accept new paths
+    kMoving     = 2, // Actively running an interpolator, velocity command, or jog stream
+    kSettling   = 3, // After planning finished / Changing Control Mode / Stopping
+    kError      = 4, // Safeguard stop triggered; hardware limits breached or E-stop
+    kRecovery   = 5, // Resetting safety loops and clearing faults
+    kShutdown   = 6, // Disabling amplifiers and powering down safely
 };
 
-enum class PlannerStatus{
-    kShutdown = -1,
-    kNormal = 0,
-    kRunningJointLimit,
-    kRunningSaturation,
-    kRunningQuickstop,
+enum class PlanResult {
+    kSuccess                    = 0,  // IK passed, time allocation valid, safe to execute
+    kPoseNotReachable           = 1,  // Target 6D pose is physically outside the workspace
+    kLinearPathFailed           = 2,  // Reachable target, but continuous linear path is blocked (Singularity / Joint Limit)
 };
 
-enum class CommandPriorityLevel{
-    kEmergency=0,
-    kLocalGUI,
-    kOther,
+namespace DiagnosticFlags {    
+    constexpr uint32_t kNone                         = 0; // No warning
+    
+    // --- Target Profile Saturation (Pre-Interpolation) ---
+    constexpr uint32_t kTargetPosSaturation          = 1 << 0; // User target clamped by soft position limits
+    constexpr uint32_t kTargetVelSaturation          = 1 << 1; // User target clamped by soft velocity limits
+    constexpr uint32_t kTargetTorSaturation          = 1 << 2; // User target clamped by soft torque limits
+    
+    // --- Real-Time Command Saturation (Post-PID Loop) ---
+    constexpr uint32_t kActuatorPosSaturation        = 1 << 3; // Actuator command clamped by soft position limits
+    constexpr uint32_t kActuatorVelSaturation        = 1 << 4; // Actuator command clamped by soft velocity limits
+    constexpr uint32_t kActuatorTorSaturation        = 1 << 5; // Actuator command clamped by soft torque limits
+    constexpr uint32_t kActuatorPosJumpSaturation    = 1 << 6; // Actuator command clamped by position jump limit
+    constexpr uint32_t kActuatorVelJumpSaturation    = 1 << 7; // Actuator command clamped by velocity jump limit
+    constexpr uint32_t kActuatorTorJumpSaturation    = 1 << 8; // Actuator command clamped by torque jump limit
+    
+    // --- Soft Workspace Boundary Safety Interceptions ---
+    constexpr uint32_t kBoundaryVelClamp             = 1 << 9;  // Velocity zeroed in limit direction due to position boundary reached
+    constexpr uint32_t kBoundaryJointImpedance       = 1 << 10; // Joint impedance applied due to position boundary reached
+    
+    // --- Algorithmic & Kinematic Planner Modifications ---
+    constexpr uint32_t kPlanTimelineExtended         = 1 << 11; // Trajectory segment duration (dt) stretched for velocity limits
+    constexpr uint32_t kPlanVelLimitInvalid          = 1 << 12; // Specified max velocity profile is smaller than the minimum allowed velocity
+    constexpr uint32_t kPlanDeltaTooLarge            = 1 << 13; // Distance between points is too large for a dynamic timeline
+    constexpr uint32_t kPlanVelocitySnap             = 1 << 14; // Large velocity shift over zero distance
+    constexpr uint32_t kPlanPointSkipped             = 1 << 15; // Duplicated points skipped
+
+    // --- Fault Flags ---
+    constexpr uint32_t kFaultPosHardLimitReached     = 1 << 16;
+    constexpr uint32_t kFaultVelHardLimitReached     = 1 << 17;
+    constexpr uint32_t kFaultTorHardLimitReached     = 1 << 18;
+    constexpr uint32_t kFaultPosTrackingFailed       = 1 << 19;
+    constexpr uint32_t kFaultVelTrackingFailed       = 1 << 20;
+    constexpr uint32_t kFaultTorTrackingFailed       = 1 << 21;
+    
+    constexpr uint32_t kFaultArmNotFound             = 1 << 22;
+    constexpr uint32_t kFaultGripperNotFound         = 1 << 23;
+    constexpr uint32_t kFaultHardwareInitFailed      = 1 << 24;
+
+    constexpr uint32_t kFaultUnknown                 = 1 << 31;
 };
+
 /*
  * Micro for data transfermation
  */
@@ -76,6 +105,7 @@ enum class CommandPriorityLevel{
 #define MAX_IMAGE_SIZE                921600 //480x640x3
 #define MAX_WAYPOINTS                 20   
 #define MAX_SHPERES_SIZE              65536
+#define MAX_COMPONENT_SIZE            3 //kArm, kGripper
 
 template<typename T>
 std::string enumToString(T x){
@@ -105,12 +135,14 @@ std::vector<std::string> getAllEnumNames(){
 }
 
 struct PlannerState{
-    long    send_timestamp;
-    long    received_panel_command_timestamp;
-    bool    setting_update_finished;
+    long        send_timestamp;
+    long        received_panel_command_timestamp;
+    bool        setting_update_finished;
+    uint32_t    received_sequence_id;
 
     uint8_t ArmSize;
     uint8_t JointSize[MAX_ARM_SIZE];
+    bool    enabled_joint[MAX_ARM_SIZE][MAX_JOINT_SIZE];
     float JointPos[MAX_ARM_SIZE][MAX_JOINT_SIZE];
     float JointVel[MAX_ARM_SIZE][MAX_JOINT_SIZE];
     float JointTor[MAX_ARM_SIZE][MAX_JOINT_SIZE];
@@ -129,10 +161,30 @@ struct PlannerState{
     uint8_t GripperJointSize[MAX_ARM_SIZE];
     float   GripperJointPos[MAX_ARM_SIZE][MAX_JOINT_SIZE];
 
-    ////////////for debug & internal use/////////////////////
-    PlannerMode mode;
-    PlannerStatus status;
+    //Config setting
+    float tool_offset[MAX_ARM_SIZE][3];
+    float arm_soft_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_soft_limit_velocity[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_soft_limit_torque[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_hard_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_hard_limit_velocity[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_hard_limit_torque[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_follow_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    float arm_follow_limit_velocity[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    float arm_follow_limit_torque[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    float arm_jump_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    float arm_jump_limit_velocity[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    float arm_jump_limit_torque[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    float gripper_soft_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float gripper_hard_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
 
+    //Status
+    SystemState     system_state;
+    PlanResult      plan_result;
+    uint32_t        system_diagnostic_flags; 
+    uint32_t        arm_joint_diagnostic_flags[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+
+    ////////////for debug & internal use/////////////////////
     float FilteredMotorTor[MAX_ARM_SIZE][MAX_MOTOR_SIZE];
     float FilteredMotorTorKalman[MAX_ARM_SIZE][MAX_MOTOR_SIZE];
     float FilteredMotorTorEuro[MAX_ARM_SIZE][MAX_MOTOR_SIZE];
@@ -189,11 +241,9 @@ struct RobotState{
 
 struct PanelCommand{
     long    send_timestamp;
+    uint32_t sequence_id;
     ConnectionState connection_state;
     
-    CommandPriorityLevel priority;
-    uint32_t sequence;
-
     //Settings
     bool need_setting_update;
     bool simulation;
@@ -203,11 +253,12 @@ struct PanelCommand{
     ControlType target_type;
     ControlType actuator_mode;
     InterpolationMethod interpolation_type;
+    float interpolation_speed_ratio;
     float InterpolationAccTime;
     float InterpolationConstVelTime;
     float NoneInterpolationSaturationRatio;
-    bool reset_joint_interpolation;
-    ForceControlMode force_control;
+    bool reset_interpolation;
+    ControlAlgorithm control_algorithm;
 
     //Arm related
     PanelTargetMode arm_target_mode;
@@ -225,17 +276,28 @@ struct PanelCommand{
     uint8_t ArmWaypointSize;
     float ArmWaypointDt;
     float ArmWaypointCmd[MAX_WAYPOINTS][MAX_ARM_SIZE][MAX_JOINT_SIZE]; //in Radian for pos/vel
+    float ArmWaypointInterpolationTime[MAX_WAYPOINTS]; //in Radian for pos/vel
+    float ArmWaypointInterpolationSpeedRatio[MAX_WAYPOINTS]; //in Radian for pos/vel
 
     //Gripper related
     uint8_t GripperSize;
     uint8_t GripperJointSize[MAX_ARM_SIZE];
     float   GripperJointCmd[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+
+    //Config setting
+    float tool_offset[MAX_ARM_SIZE][3];
+    float arm_soft_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_soft_limit_velocity[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float gripper_soft_limit_position[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
     
     ////////////for debug & internal use/////////////////////
     float MotorCmdDeg[MAX_ARM_SIZE][MAX_JOINT_SIZE];
     float JointCmdDeg[MAX_ARM_SIZE][MAX_JOINT_SIZE];
     float TaskCmdDeg[MAX_ARM_SIZE][6];
     float ArmWaypointCmdDeg[MAX_WAYPOINTS][MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    float arm_soft_limit_position_deg[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float arm_soft_limit_velocity_deg[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
+    float gripper_soft_limit_position_deg[MAX_ARM_SIZE][MAX_JOINT_SIZE][2];
 
     //Time cost
     long LastReceiveTime;
@@ -354,6 +416,7 @@ void print_panel_command(PanelCommand* panel);
 void print_planner_state(PlannerState* state);
 void print_planner_command(PlannerCommand* command);
 void print_rt_config_state(RtConfigState* state);
+void print_diagnostic_flags(uint32_t flags);
 ///////////////////////////////////////////Curobo//////////////////////////////////////////////////////
 struct CuroboCommand{
     //Arm related

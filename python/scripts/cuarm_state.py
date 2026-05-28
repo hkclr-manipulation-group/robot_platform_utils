@@ -306,7 +306,7 @@ class RtInterpolationMethod(Enum):
     NONE = 4
     QUINTIC_PATH = 5
 
-class RtForceControlMode(Enum):
+class RtControlAlgorithm(Enum):
     NONE = 0
     GRAVITY = 1
     GRAVITY_WITH_BOUNDARY = 2
@@ -338,8 +338,8 @@ class RtPanelCommand:
     interpolation_acc_time: float = 0.0
     interpolation_const_vel_time: float = 0.0
     none_interpolation_saturation_ratio: float = 0.0
-    reset_joint_interpolation: bool = False
-    force_control: RtForceControlMode = RtForceControlMode.NONE
+    reset_interpolation: bool = False
+    control_algorithm: RtControlAlgorithm = RtControlAlgorithm.NONE
 
     # Arm related
     arm_target_mode: PanelTargetMode = PanelTargetMode.SINGLE_POINT

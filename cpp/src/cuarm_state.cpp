@@ -5,8 +5,8 @@ void print_panel_command(PanelCommand* panel){
 	printf("\nRobot: (send_timestamp: %ld, ArmSize: %d)\n", panel->send_timestamp, panel->ArmSize);
 	printf("simulation: %d, motion_type: %d, task_orien_type: %d, reset_control_mem: %d \n", panel->simulation, (int)panel->motion_type, (int)panel->task_orien_type, panel->reset_control_mem);
 	printf("target_type: %d, actuator_mode: %d, interpolation_type: %d\n", (int)panel->target_type, (int)panel->actuator_mode, (int)panel->interpolation_type);
-    printf("InterpolationAccTime: %f, InterpolationConstVelTime: %f, reset_joint_interpolation: %d \n", panel->InterpolationAccTime, panel->InterpolationConstVelTime, panel->reset_joint_interpolation);
-	printf("force_control: %d \n", (int)panel->force_control);
+    printf("InterpolationAccTime: %f, InterpolationConstVelTime: %f, reset_interpolation: %d \n", panel->InterpolationAccTime, panel->InterpolationConstVelTime, panel->reset_interpolation);
+	printf("control_algorithm: %d \n", (int)panel->control_algorithm);
     
     for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
         printf("Arm_i: %d\n", arm_i);
@@ -194,4 +194,94 @@ void print_rt_config_state(RtConfigState* state){
         }
     }
     printf("\n");
+}
+
+void print_diagnostic_flags(uint32_t flags){
+    if (flags == DiagnosticFlags::kNone){
+        printf("None\n");
+        return;
+    }
+    
+    if (flags & DiagnosticFlags::kTargetPosSaturation){
+        printf("kTargetPosSaturation: User target clamped by soft position limits\n");
+    }
+    if (flags & DiagnosticFlags::kTargetVelSaturation){
+        printf("kTargetVelSaturation: User target clamped by soft velocity limits\n");
+    }
+    if (flags & DiagnosticFlags::kTargetTorSaturation){
+        printf("kTargetTorSaturation: User target clamped by soft torque limits\n");
+    }
+    if (flags & DiagnosticFlags::kActuatorPosSaturation){
+        printf("kActuatorPosSaturation: Actuator command clamped by soft position limits\n");
+    }
+    if (flags & DiagnosticFlags::kActuatorVelSaturation){
+        printf("kActuatorVelSaturation: Actuator command clamped by soft velocity limits\n");
+    }
+    if (flags & DiagnosticFlags::kActuatorTorSaturation){
+        printf("kActuatorTorSaturation: Actuator command clamped by soft torque limits\n");
+    }
+    if (flags & DiagnosticFlags::kActuatorPosJumpSaturation){
+        printf("kActuatorPosJumpSaturation: Actuator command clamped by position jump limit\n");
+    }
+    if (flags & DiagnosticFlags::kActuatorVelJumpSaturation){
+        printf("kActuatorVelJumpSaturation: Actuator command clamped by velocity jump limit\n");
+    }
+    if (flags & DiagnosticFlags::kActuatorTorJumpSaturation){
+        printf("kActuatorTorJumpSaturation: Actuator command clamped by torque jump limit\n");
+    }
+    if (flags & DiagnosticFlags::kBoundaryVelClamp){
+        printf("kBoundaryVelClamp: Velocity zeroed in limit direction due to position boundary reached\n");
+    }
+    if (flags & DiagnosticFlags::kBoundaryJointImpedance){
+        printf("kBoundaryJointImpedance: Joint impedance applied due to position boundary reached\n");
+    }
+
+    // --- Algorithmic & Kinematic Planner Modifications ---
+    if (flags & DiagnosticFlags::kPlanTimelineExtended){
+        printf("kPlanTimelineExtended: Trajectory segment duration (dt) stretched for velocity limits\n");
+    }
+    if (flags & DiagnosticFlags::kPlanVelLimitInvalid){
+        printf("kPlanVelLimitInvalid: Specified max velocity profile is below tolerance(1e-4)\n");
+    }
+    if (flags & DiagnosticFlags::kPlanDeltaTooLarge){
+        printf("kPlanDeltaTooLarge: Distance between points requires unachievable time scaling\n");
+    }
+    if (flags & DiagnosticFlags::kPlanVelocitySnap){
+        printf("kPlanVelocitySnap: Large velocity shift over zero distance\n");
+    }
+    if (flags & DiagnosticFlags::kPlanPointSkipped){
+        printf("kPlanPointSkipped: Duplicated points skipped\n");
+    }
+
+    // --- Fault Flags ---
+    if (flags & DiagnosticFlags::kFaultPosHardLimitReached){
+        printf("kFaultPosHardLimitReached: Position hard limit reached\n");
+    }
+    if (flags & DiagnosticFlags::kFaultVelHardLimitReached){
+        printf("kFaultVelHardLimitReached: Velocity hard limit reached\n");
+    }
+    if (flags & DiagnosticFlags::kFaultTorHardLimitReached){
+        printf("kFaultTorHardLimitReached: Torque hard limit reached\n");
+    }
+    if (flags & DiagnosticFlags::kFaultPosTrackingFailed){
+        printf("kFaultPosTrackingFailed: Position tracking failed\n");
+    }
+    if (flags & DiagnosticFlags::kFaultVelTrackingFailed){
+        printf("kFaultVelTrackingFailed: Velocity tracking failed\n");
+    }
+    if (flags & DiagnosticFlags::kFaultTorTrackingFailed){
+        printf("kFaultTorTrackingFailed: Torque tracking failed\n");
+    }
+    if (flags & DiagnosticFlags::kFaultArmNotFound){
+        printf("kFaultArmNotFound: Arm not found\n");
+    }
+    if (flags & DiagnosticFlags::kFaultGripperNotFound){
+        printf("kFaultGripperNotFound: Gripper not found\n");
+    }
+    if (flags & DiagnosticFlags::kFaultHardwareInitFailed){
+        printf("kFaultHardwareInitFailed: Hardware initialization failed\n");
+    }
+    if (flags & DiagnosticFlags::kFaultUnknown){
+        printf("kFaultUnknown: Unknown fault\n");
+    }
 }

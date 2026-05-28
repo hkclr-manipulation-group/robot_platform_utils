@@ -1,12 +1,12 @@
 #ifndef CUARM_UDP_H
 #define CUARM_UDP_H
 
+#include <iostream>
 #include <memory>
 
+#include "curi_udp/c/curi_udp.h"
 #include "cuarm_state.h"
-#include "curi_udp.h"
 #include "cuarm_message_handler.h"
-#include <iostream>
 
 template <typename UnpackT, typename PackT>
 class CuarmUdp{

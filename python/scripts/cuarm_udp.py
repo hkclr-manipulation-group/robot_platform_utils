@@ -407,8 +407,8 @@ class CuarmUdp(UdpSocket):
         message += self._to_string(data.interpolation_acc_time)
         message += self._to_string(data.interpolation_const_vel_time)
         message += self._to_string(data.none_interpolation_saturation_ratio)
-        message += self._to_string(data.reset_joint_interpolation)
-        message += self._to_string(data.force_control)
+        message += self._to_string(data.reset_interpolation)
+        message += self._to_string(data.control_algorithm)
         
         # Arm related
         message += self._to_string(data.arm_target_mode.value)

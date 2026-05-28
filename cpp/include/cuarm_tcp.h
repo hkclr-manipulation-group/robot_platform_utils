@@ -5,7 +5,7 @@
 #include <memory>
 
 #include "cuarm_state.h"
-#include "curi_tcp.h"
+#include "curi_tcp/c/src/curi_tcp.h"
 #include "cuarm_message_handler.h"
 
 template <typename UnpackT, typename PackT>
