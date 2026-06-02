@@ -203,85 +203,85 @@ void print_diagnostic_flags(uint32_t flags){
     }
     
     if (flags & DiagnosticFlags::kTargetPosSaturation){
-        printf("kTargetPosSaturation: User target clamped by soft position limits\n");
+        printf("TargetPosSaturation: User target clamped by soft position limits\n");
     }
     if (flags & DiagnosticFlags::kTargetVelSaturation){
-        printf("kTargetVelSaturation: User target clamped by soft velocity limits\n");
+        printf("TargetVelSaturation: User target clamped by soft velocity limits\n");
     }
     if (flags & DiagnosticFlags::kTargetTorSaturation){
-        printf("kTargetTorSaturation: User target clamped by soft torque limits\n");
+        printf("TargetTorSaturation: User target clamped by soft torque limits\n");
     }
     if (flags & DiagnosticFlags::kActuatorPosSaturation){
-        printf("kActuatorPosSaturation: Actuator command clamped by soft position limits\n");
+        printf("ActuatorPosSaturation: Actuator command clamped by soft position limits\n");
     }
     if (flags & DiagnosticFlags::kActuatorVelSaturation){
-        printf("kActuatorVelSaturation: Actuator command clamped by soft velocity limits\n");
+        printf("ActuatorVelSaturation: Actuator command clamped by soft velocity limits\n");
     }
     if (flags & DiagnosticFlags::kActuatorTorSaturation){
-        printf("kActuatorTorSaturation: Actuator command clamped by soft torque limits\n");
+        printf("ActuatorTorSaturation: Actuator command clamped by soft torque limits\n");
     }
     if (flags & DiagnosticFlags::kActuatorPosJumpSaturation){
-        printf("kActuatorPosJumpSaturation: Actuator command clamped by position jump limit\n");
+        printf("ActuatorPosJumpSaturation: Actuator command clamped by position jump limit\n");
     }
     if (flags & DiagnosticFlags::kActuatorVelJumpSaturation){
-        printf("kActuatorVelJumpSaturation: Actuator command clamped by velocity jump limit\n");
+        printf("ActuatorVelJumpSaturation: Actuator command clamped by velocity jump limit\n");
     }
     if (flags & DiagnosticFlags::kActuatorTorJumpSaturation){
-        printf("kActuatorTorJumpSaturation: Actuator command clamped by torque jump limit\n");
+        printf("ActuatorTorJumpSaturation: Actuator command clamped by torque jump limit\n");
     }
     if (flags & DiagnosticFlags::kBoundaryVelClamp){
-        printf("kBoundaryVelClamp: Velocity zeroed in limit direction due to position boundary reached\n");
+        printf("BoundaryVelClamp: Velocity zeroed in limit direction due to position boundary reached\n");
     }
     if (flags & DiagnosticFlags::kBoundaryJointImpedance){
-        printf("kBoundaryJointImpedance: Joint impedance applied due to position boundary reached\n");
+        printf("BoundaryJointImpedance: Joint impedance applied due to position boundary reached\n");
     }
 
     // --- Algorithmic & Kinematic Planner Modifications ---
     if (flags & DiagnosticFlags::kPlanTimelineExtended){
-        printf("kPlanTimelineExtended: Trajectory segment duration (dt) stretched for velocity limits\n");
+        printf("PlanTimelineExtended: Trajectory segment duration (dt) stretched for velocity limits\n");
     }
     if (flags & DiagnosticFlags::kPlanVelLimitInvalid){
-        printf("kPlanVelLimitInvalid: Specified max velocity profile is below tolerance(1e-4)\n");
+        printf("PlanVelLimitInvalid: Specified max velocity profile is below tolerance(1e-4)\n");
     }
     if (flags & DiagnosticFlags::kPlanDeltaTooLarge){
-        printf("kPlanDeltaTooLarge: Distance between points requires unachievable time scaling\n");
+        printf("PlanDeltaTooLarge: Distance between points requires unachievable time scaling\n");
     }
     if (flags & DiagnosticFlags::kPlanVelocitySnap){
-        printf("kPlanVelocitySnap: Large velocity shift over zero distance\n");
+        printf("PlanVelocitySnap: Large velocity shift over zero distance\n");
     }
     if (flags & DiagnosticFlags::kPlanPointSkipped){
-        printf("kPlanPointSkipped: Duplicated points skipped\n");
+        printf("PlanPointSkipped: Duplicated points skipped\n");
     }
 
     // --- Fault Flags ---
     if (flags & DiagnosticFlags::kFaultPosHardLimitReached){
-        printf("kFaultPosHardLimitReached: Position hard limit reached\n");
+        printf("FaultPosHardLimitReached: Position hard limit reached\n");
     }
     if (flags & DiagnosticFlags::kFaultVelHardLimitReached){
-        printf("kFaultVelHardLimitReached: Velocity hard limit reached\n");
+        printf("FaultVelHardLimitReached: Velocity hard limit reached\n");
     }
     if (flags & DiagnosticFlags::kFaultTorHardLimitReached){
-        printf("kFaultTorHardLimitReached: Torque hard limit reached\n");
+        printf("FaultTorHardLimitReached: Torque hard limit reached\n");
     }
     if (flags & DiagnosticFlags::kFaultPosTrackingFailed){
-        printf("kFaultPosTrackingFailed: Position tracking failed\n");
+        printf("FaultPosTrackingFailed: Position tracking failed\n");
     }
     if (flags & DiagnosticFlags::kFaultVelTrackingFailed){
-        printf("kFaultVelTrackingFailed: Velocity tracking failed\n");
+        printf("FaultVelTrackingFailed: Velocity tracking failed\n");
     }
     if (flags & DiagnosticFlags::kFaultTorTrackingFailed){
-        printf("kFaultTorTrackingFailed: Torque tracking failed\n");
+        printf("FaultTorTrackingFailed: Torque tracking failed\n");
     }
     if (flags & DiagnosticFlags::kFaultArmNotFound){
-        printf("kFaultArmNotFound: Arm not found\n");
+        printf("FaultArmNotFound: Arm not found\n");
     }
     if (flags & DiagnosticFlags::kFaultGripperNotFound){
-        printf("kFaultGripperNotFound: Gripper not found\n");
+        printf("FaultGripperNotFound: Gripper not found\n");
     }
     if (flags & DiagnosticFlags::kFaultHardwareInitFailed){
-        printf("kFaultHardwareInitFailed: Hardware initialization failed\n");
+        printf("FaultHardwareInitFailed: Hardware initialization failed\n");
     }
     if (flags & DiagnosticFlags::kFaultUnknown){
-        printf("kFaultUnknown: Unknown fault\n");
+        printf("FaultUnknown: Unknown fault\n");
     }
 }
