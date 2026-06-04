@@ -39,6 +39,8 @@ void CuarmMessageHandler::pack_panel_command(PanelCommand* panel, char* send_buf
     sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", panel->NoneInterpolationSaturationRatio);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)panel->reset_interpolation);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)panel->control_algorithm);
+    sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)panel->enable_recording);
+    sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)panel->playback_cmd);
 
     //Arm related
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)panel->arm_target_mode);
@@ -128,6 +130,8 @@ void CuarmMessageHandler::unpack_panel_command(PanelCommand* panel, char* receiv
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->NoneInterpolationSaturationRatio));
     scan_type<bool, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), panel->reset_interpolation);
     scan_type<ControlAlgorithm, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), panel->control_algorithm);
+    scan_type<bool, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), panel->enable_recording);
+    scan_type<PlaybackState, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), panel->playback_cmd);
     
     //Arm related
     scan_type<PanelTargetMode, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), panel->arm_target_mode);

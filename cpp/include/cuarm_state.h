@@ -11,7 +11,7 @@
 // extern "C" 
 // {
 // #endif
-enum class MotionControl{kJoint, kNull, kTask, kMotor, kTaskLine, kJointJog, kTaskJog, kTaskLineJog, kControlAlgorithm, kTeach, kReplay};
+enum class MotionControl{kJoint, kNull, kTask, kMotor, kTaskLine, kControlAlgorithm, kJointJog, kTaskJog, kTaskLineJog, kPlayback};
 enum OrientControl{kEnd, kBase};
 enum InterpolationMethod{kLinear, kCos, kCubic, kQuintic, kNone, kQuinticPath};
 enum class InterpolationMotionPhase{kInitialized, kAcceleration, kConstantVelocity, kDeceleration, kFinished, kInterrupted};
@@ -31,6 +31,13 @@ enum class PanelRemoteState{kStop, kStart};
 enum class PanelTargetMode{kSinglePoint, kWaypoint, kRawSinglePoint};
 enum ComponentType{kArm, kGripper};
 enum ConnectionState{kWaiting, kRemote, kShutDown};
+enum class LineMoveStrategy {
+    kRejectEntirely = 0, // Abort the move immediately; do not start moving.
+    kStopAtBoundary = 1, // Move and stop smoothly at the last reachable point before the failure.
+    kDeviateAndBypassing = 2, // Deviate from the line (e.g., switch to joint space) to bypass the unreachable zone.
+    kSegmentedExecution = 3 // Execute valid parts, skip the bad segment, and resume line tracking later.
+};
+enum class PlaybackState{kStart, kStop, kReset};
 
 //operational state
 enum class SystemState{
@@ -259,6 +266,10 @@ struct PanelCommand{
     float NoneInterpolationSaturationRatio;
     bool reset_interpolation;
     ControlAlgorithm control_algorithm;
+
+    //Recording & Playback
+    bool enable_recording;
+    PlaybackState playback_cmd;
 
     //Arm related
     PanelTargetMode arm_target_mode;
