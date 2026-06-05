@@ -37,7 +37,7 @@ enum class LineMoveStrategy {
     kDeviateAndBypassing = 2, // Deviate from the line (e.g., switch to joint space) to bypass the unreachable zone.
     kSegmentedExecution = 3 // Execute valid parts, skip the bad segment, and resume line tracking later.
 };
-enum class PlaybackState{kStart, kStop, kReset};
+enum class PlaybackState{kStop, kStart, kReset};
 
 //operational state
 enum class SystemState{
