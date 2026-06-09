@@ -11,7 +11,7 @@
 template <typename UnpackT, typename PackT>
 class CuarmUdp{
     public:
-        CuarmUdp(char local_ip[], int local_port, char remote_ip[], int remote_port, 
+        CuarmUdp(const std::string& local_ip, int local_port, const std::string& remote_ip, int remote_port, 
             void (*unpack_func)(UnpackT*, char*) = nullptr,
             void (*pack_func)(PackT*, char*, int) = nullptr, 
             int buffer_size=4096);
@@ -25,18 +25,22 @@ class CuarmUdp{
         void (*unpack_function_)(UnpackT*, char*) = nullptr;
         std::unique_ptr<udp_node> udp_node_ptr_;
         int buffer_size_;
+        std::string local_ip_;
+        std::string remote_ip_;
 };
 
 template <typename UnpackT, typename PackT>
-CuarmUdp<UnpackT, PackT>::CuarmUdp(char local_ip[], int local_port, char remote_ip[], int remote_port, 
+CuarmUdp<UnpackT, PackT>::CuarmUdp(const std::string& local_ip, int local_port, const std::string& remote_ip, int remote_port, 
     void (*unpack_func)(UnpackT*, char*),
     void (*pack_func)(PackT*, char*, int), 
     int buffer_size){
     buffer_size_ = buffer_size;
     udp_node_ptr_ = std::make_unique<udp_node>();
-
+    local_ip_ = local_ip;
+    remote_ip_ = remote_ip;
+    
     //Initialize UDP node and Sockets
-    int ret = udp_init(udp_node_ptr_.get(), local_ip, local_port, remote_ip, remote_port, buffer_size_);
+    int ret = udp_init(udp_node_ptr_.get(), local_ip_.c_str(), local_port, remote_ip_.c_str(), remote_port, buffer_size_);
     if (ret != 0){
         throw std::runtime_error("Failed to initialize UDP node, return code: " + std::to_string(ret));
     }

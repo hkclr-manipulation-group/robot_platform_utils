@@ -11,7 +11,7 @@
 template <typename UnpackT, typename PackT>
 class CuarmTcp{
     public:
-        CuarmTcp(char server_ip[], int server_port, bool is_server,
+        CuarmTcp(const std::string& server_ip, int server_port, bool is_server,
             void (*unpack_func)(UnpackT*, char*) = nullptr,
             void (*pack_func)(PackT*, char*, int) = nullptr, 
             int buffer_size=4096);
@@ -28,10 +28,11 @@ class CuarmTcp{
         std::unique_ptr<tcp_node> tcp_node_ptr_;
         int buffer_size_;
         bool is_server_;
+        std::string server_ip_;
 };
 
 template <typename UnpackT, typename PackT>
-CuarmTcp<UnpackT, PackT>::CuarmTcp(char server_ip[], int server_port, bool is_server,
+CuarmTcp<UnpackT, PackT>::CuarmTcp(const std::string& server_ip, int server_port, bool is_server,
     void (*unpack_func)(UnpackT*, char*),
     void (*pack_func)(PackT*, char*, int), 
     int buffer_size){
@@ -40,9 +41,10 @@ CuarmTcp<UnpackT, PackT>::CuarmTcp(char server_ip[], int server_port, bool is_se
     pack_function_ = pack_func;
     unpack_function_ = unpack_func;
     is_server_ = is_server;
+    server_ip_ = server_ip;
     
     //Initialize TCP node and Sockets
-    int ret = tcp_init(tcp_node_ptr_.get(), server_ip, server_port, buffer_size_, is_server);
+    int ret = tcp_init(tcp_node_ptr_.get(), server_ip_.c_str(), server_port, buffer_size_, is_server);
     if (ret != 0){
         if (is_server){
             throw std::runtime_error("Failed to initialize TCP server, return code: " + std::to_string(ret));
