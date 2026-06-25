@@ -1,21 +1,19 @@
+#if defined(_WIN32) || defined(WIN32)
+    #include <windows.h>
+    #include <shlwapi.h>
+    #pragma comment(lib, "Shlwapi.lib")
+#else
+    #include <libgen.h>
+#endif
 #include <iostream>
 #include <string>
-#include <libgen.h>
 #include <algorithm>
 #include <cstring>
 #include <vector>
 #include <fstream>
+#include <filesystem>
 
 #include "config_loader.h"
-
-// Helper function to get directory part of a path
-std::string getDirectory(const std::string& filepath) {
-    char* path_copy = strdup(filepath.c_str());
-    char* dir = dirname(path_copy);
-    std::string result(dir);
-    free(path_copy);
-    return result;
-}
 
 // Helper function to merge two YAML nodes
 // Imported values override existing values for scalars,
@@ -72,29 +70,40 @@ void mergeYamlNodes(YAML::Node& target, const YAML::Node& source) {
 YAML::Node processImportsRecursive(const YAML::Node& config, const std::string& base_dir) {
     YAML::Node result;
 
-    // Helper lambda to process a single import path
+    // Helper lambda to process a single import path safely across Windows & Linux
     auto processSingleImport = [&](const std::string& import_path) -> YAML::Node {
-        std::string full_path;
+        std::filesystem::path full_path;
+        
         if (!import_path.empty() && import_path[0] == '/') {
-            full_path = import_path;
+            // Absolute path processing
+            full_path = std::filesystem::path(import_path);
         } else {
-            full_path = base_dir + "/" + import_path;
+            // Relative path calculation using filesystem operators
+            full_path = std::filesystem::path(base_dir) / import_path;
         }
+        
+        // Normalize the native formatting profile immediately
+        full_path = full_path.make_preferred();
+        std::string safe_full_path = full_path.string();
+        std::ifstream file_stream(full_path);
+        if (!file_stream.is_open()) {
+            std::cerr << "[CRITICAL] Failed to open sub-import file stream: " << safe_full_path << std::endl;
+            return YAML::Node(YAML::NodeType::Undefined);
+        }
+        
+        YAML::Node imported_config = YAML::Load(file_stream);
+        file_stream.close();
 
-        // Load imported config
-        YAML::Node imported_config = YAML::LoadFile(full_path);
-
-        // Recursively process imports in the imported config first
         return processImportsRecursive(imported_config, base_dir);
     };
-
+    
     if (config.IsMap()) {
         result = YAML::Node(YAML::NodeType::Map);
 
         // Process all keys in the map
         for (auto it = config.begin(); it != config.end(); ++it) {
             std::string key_str = it->first.as<std::string>();
-            YAML::Node child = config[key_str];
+            YAML::Node child = it->second; 
             if (key_str == "import_yaml") {
                 std::string import_path = child.as<std::string>();
                 YAML::Node imported = processSingleImport(import_path);
@@ -119,15 +128,30 @@ YAML::Node processImportsRecursive(const YAML::Node& config, const std::string& 
 
 YAML::Node loadYamlConfig(const std::string& filename) {
     // Load the main config file
-    YAML::Node config = YAML::LoadFile(filename);
+    YAML::Node config;
+    std::string safe_base_dir;
 
-    // Get base directory for resolving relative paths
-    std::string base_dir = getDirectory(filename);
-    
+    try {
+        std::filesystem::path native_path(filename);
+        native_path = native_path.make_preferred();
+        std::string safe_path = native_path.string();
+        std::ifstream file_stream(native_path); 
+        if (!file_stream.is_open()) {
+            throw std::runtime_error("OS failed to open input stream handle.");
+        }
+        config = YAML::Load(file_stream); 
+        file_stream.close();
+        safe_base_dir = native_path.parent_path().make_preferred().string();
+    }catch (const YAML::BadFile& e) {
+        std::cerr << "[YAML Error] File was not found or could not be read: " << e.what() << std::endl;
+    }catch (const YAML::ParserException& e) {
+        std::cerr << "[YAML Error] Syntax/Formatting error in YAML content: " << e.what() << std::endl;
+    }catch (const std::exception& e) {
+        std::cerr << "[General Error] Standard exception caught: " << e.what() << std::endl;
+    }
+
     // Process all imports recursively
-    YAML::Node result = processImportsRecursive(config, base_dir);
-
-    return result;
+    return processImportsRecursive(config, safe_base_dir);
 }
 
 // Helper function to check if a sequence contains only scalars
@@ -263,7 +287,7 @@ bool writeYamlNode(const YAML::Node& node, const std::string& write_path){
         
         fout.close();
         return true;
-    } catch (const std::exception& e) {
+    } catch (const std::exception&) {
         // Handle unexpected IO or YAML errors
         return false;
     }

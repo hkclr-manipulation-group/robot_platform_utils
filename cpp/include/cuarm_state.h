@@ -350,8 +350,8 @@ struct PanelState{
 };
 
 struct RemotePanelCommand{
-    float interpolation_acceleration_time = 5.0;
-    float no_interpolation_max_velocity_ratio = 0.1;
+    float interpolation_acceleration_time = 5.0f;
+    float no_interpolation_max_velocity_ratio = 0.1f;
     ControlType target_type;
     ControlType actuator_mode;
 

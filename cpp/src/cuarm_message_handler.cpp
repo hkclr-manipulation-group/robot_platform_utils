@@ -19,7 +19,6 @@ int CuarmMessageHandler::get_next_data_index(char* receive_buffer, int index){
 }
 
 void CuarmMessageHandler::pack_panel_command(PanelCommand* panel, char* send_buffer, int buffer_size){
-    int i, arm_i, gri_i, cam_i;
     memset(send_buffer, 0, buffer_size);
     sprintf(send_buffer, "%ld#", panel->send_timestamp);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%u#", panel->sequence_id);
@@ -45,19 +44,19 @@ void CuarmMessageHandler::pack_panel_command(PanelCommand* panel, char* send_buf
     //Arm related
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)panel->arm_target_mode);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", panel->ArmSize);
-    for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
         sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", panel->JointSize[arm_i]);
         snprintf(&(send_buffer[strlen(send_buffer)]), MAX_ROBOTNAME_SIZE+1, "%s#", panel->RobotName[arm_i]);
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)panel->enable_joint[arm_i][i]);
         }
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->MotorCmd[arm_i][i]);
         }
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->JointCmd[arm_i][i]);
         }
-        for (i = 0; i <6; ++ i){
+        for (int i = 0; i <6; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->TaskCmd[arm_i][i]);
         }
     }
@@ -65,8 +64,8 @@ void CuarmMessageHandler::pack_panel_command(PanelCommand* panel, char* send_buf
     sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", panel->ArmWaypointSize);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", panel->ArmWaypointDt);
     for (int point_i =0; point_i < panel->ArmWaypointSize; point_i++){
-        for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
-            for (i =0; i < panel->JointSize[arm_i]; i++){
+        for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+            for (int i =0; i < panel->JointSize[arm_i]; i++){
                 sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", panel->ArmWaypointCmd[point_i][arm_i][i]);
             }
         }
@@ -76,31 +75,31 @@ void CuarmMessageHandler::pack_panel_command(PanelCommand* panel, char* send_buf
 
     //Gripper related
     sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", panel->GripperSize);
-    for (gri_i = 0; gri_i < panel->GripperSize; gri_i++){
+    for (int gri_i = 0; gri_i < panel->GripperSize; gri_i++){
         sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", panel->GripperJointSize[gri_i]);
-        for (i = 0; i < panel->GripperJointSize[gri_i]; ++ i){
+        for (int i = 0; i < panel->GripperJointSize[gri_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->GripperJointCmd[gri_i][i]);
         }
     }
 
     //Config setting
-    for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
         sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->tool_offset[arm_i][0]);
         sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->tool_offset[arm_i][1]);
         sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->tool_offset[arm_i][2]);
     }
-    for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i){
+    for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->arm_soft_limit_position[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->arm_soft_limit_position[arm_i][i][1]);
         }
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->arm_soft_limit_velocity[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->arm_soft_limit_velocity[arm_i][i][1]);
         }
     }
-    for (gri_i = 0; gri_i < panel->GripperSize; gri_i++){
-        for (i = 0; i < panel->GripperJointSize[gri_i]; ++ i){
+    for (int gri_i = 0; gri_i < panel->GripperSize; gri_i++){
+        for (int i = 0; i < panel->GripperJointSize[gri_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->gripper_soft_limit_position[gri_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->gripper_soft_limit_position[gri_i][i][1]);
         }
@@ -108,7 +107,6 @@ void CuarmMessageHandler::pack_panel_command(PanelCommand* panel, char* send_buf
 }
 
 void CuarmMessageHandler::unpack_panel_command(PanelCommand* panel, char* receive_buffer){
-	int i, j, arm_i, gri_i, cam_i;
     int index = 0;
     char robot_name_format[10];
     snprintf(robot_name_format, sizeof(robot_name_format), "%%%d[^#]", MAX_ROBOTNAME_SIZE+1);
@@ -136,19 +134,19 @@ void CuarmMessageHandler::unpack_panel_command(PanelCommand* panel, char* receiv
     //Arm related
     scan_type<PanelTargetMode, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), panel->arm_target_mode);
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(panel->ArmSize));
-    for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(panel->JointSize[arm_i]));
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), robot_name_format, &(panel->RobotName[arm_i]));
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i) {
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i) {
             scan_type<bool, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), panel->enable_joint[arm_i][i]);
         }
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i) {
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->MotorCmd[arm_i][i]));
         }
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i) {
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->JointCmd[arm_i][i]));
         }
-        for (i = 0; i < 6; ++ i) {
+        for (int i = 0; i < 6; ++ i) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->TaskCmd[arm_i][i]));
         }
     }
@@ -157,8 +155,8 @@ void CuarmMessageHandler::unpack_panel_command(PanelCommand* panel, char* receiv
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(panel->ArmWaypointSize));
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->ArmWaypointDt));
     for (int point_i = 0; point_i < panel->ArmWaypointSize; point_i++){
-        for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
-            for (i = 0; i < panel->JointSize[arm_i]; ++ i) {
+        for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+            for (int i = 0; i < panel->JointSize[arm_i]; ++ i) {
                 sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->ArmWaypointCmd[point_i][arm_i][i]));
             }
         }
@@ -168,31 +166,31 @@ void CuarmMessageHandler::unpack_panel_command(PanelCommand* panel, char* receiv
 
     //Gripper related
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(panel->GripperSize));
-    for (gri_i = 0; gri_i < panel->GripperSize; gri_i++){
+    for (int gri_i = 0; gri_i < panel->GripperSize; gri_i++){
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(panel->GripperJointSize[gri_i]));
-        for (i = 0; i < panel->GripperJointSize[gri_i]; ++ i) {
+        for (int i = 0; i < panel->GripperJointSize[gri_i]; ++ i) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->GripperJointCmd[gri_i][i]));
         }
     }
 
     //Config setting
-    for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->tool_offset[arm_i][0]));
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->tool_offset[arm_i][1]));
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->tool_offset[arm_i][2]));
     }
-    for (arm_i = 0; arm_i < panel->ArmSize; arm_i++){
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i){
+    for (int arm_i = 0; arm_i < panel->ArmSize; arm_i++){
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->arm_soft_limit_position[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->arm_soft_limit_position[arm_i][i][1]));
         }
-        for (i = 0; i < panel->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < panel->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->arm_soft_limit_velocity[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->arm_soft_limit_velocity[arm_i][i][1]));
         }
     }
-    for (gri_i = 0; gri_i < panel->GripperSize; gri_i++){
-        for (i = 0; i < panel->GripperJointSize[gri_i]; ++ i){
+    for (int gri_i = 0; gri_i < panel->GripperSize; gri_i++){
+        for (int i = 0; i < panel->GripperJointSize[gri_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->gripper_soft_limit_position[gri_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->gripper_soft_limit_position[gri_i][i][1]));
         }
@@ -292,7 +290,7 @@ void CuarmMessageHandler::unpack_panel_state(PanelState* state, char* receive_bu
         }
     }
     for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
-        for (int joint_i = 0; joint_i < joint_i < state->JointSize[arm_i]; joint_i++){
+        for (int joint_i = 0; joint_i < state->JointSize[arm_i]; joint_i++){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%f#", &(state->interpolated_target[arm_i][joint_i]));
         }
     }
@@ -316,83 +314,80 @@ void CuarmMessageHandler::unpack_panel_state(PanelState* state, char* receive_bu
 }
 
 void CuarmMessageHandler::pack_planner_command(PlannerCommand* command, char* send_buffer, int buffer_size){
-    int i, j, arm_i;
     memset(send_buffer, 0, buffer_size);
     sprintf(send_buffer, "%hhd#", (uint8_t)command->connection_state);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)command->command_mode);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", command->ArmSize);
-    for (arm_i = 0; arm_i < command->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < command->ArmSize; arm_i++){
         sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", command->JointSize[arm_i]);
-        for (i = 0; i < command->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < command->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", command->Target[arm_i][i]);
         }
     }
 }
 
 void CuarmMessageHandler::unpack_planner_command(PlannerCommand* command, char* receive_buffer){
-    int i, j, arm_i;
     int index = 0;
     scan_type<ConnectionState, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), command->connection_state);
     scan_type<ControlType, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), command->command_mode);
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(command->ArmSize));
-    for (arm_i = 0; arm_i < command->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < command->ArmSize; arm_i++){
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(command->JointSize[arm_i]));
-        for (i = 0; i < command->JointSize[arm_i]; ++ i) {
+        for (int i = 0; i < command->JointSize[arm_i]; ++ i) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(command->Target[arm_i][i]));
         }
     }
 }
 
 void CuarmMessageHandler::unpack_planner_state(PlannerState* state, char* receive_buffer){
-    int i, j, arm_i;
     int index = 0;
     sscanf(receive_buffer, "%ld#", &(state->received_panel_command_timestamp));
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%ld#", &(state->send_timestamp));
     scan_type<bool, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), state->setting_update_finished);
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%u#", &(state->received_sequence_id));
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(state->ArmSize));
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(state->JointSize[arm_i]));
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             scan_type<bool, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), state->enabled_joint[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->JointPos[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->JointVel[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->JointTor[arm_i][i]));
         }
 
         
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->MotorPos[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->MotorVel[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->MotorCur[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->MotorTor[arm_i][i]));
         }
 
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
-            for (j = 0; j < 7; j++) {
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
+            for (int j = 0; j < 7; j++) {
                 sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->JointPose[arm_i][i][j]));
             }
         }
-        for (j = 0; j < 7; j++) {
+        for (int j = 0; j < 7; j++) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->EEPose[arm_i][j]));
         }
-        for (j = 0; j < 7; j++) {
+        for (int j = 0; j < 7; j++) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->ToolPose[arm_i][j]));
         }
 
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->interpolated_target[arm_i][i]));
         }
     }
@@ -401,71 +396,71 @@ void CuarmMessageHandler::unpack_planner_state(PlannerState* state, char* receiv
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(state->GripperSize));
     for (int gri_i = 0; gri_i < state->GripperSize; gri_i++){
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhd#", &(state->GripperJointSize[gri_i]));
-        for (i = 0; i < state->GripperJointSize[gri_i]; ++ i){
+        for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->GripperJointPos[gri_i][i]));
         }
     }
 
     //Config setting
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->tool_offset[arm_i][0]));
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->tool_offset[arm_i][1]));
         sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->tool_offset[arm_i][2]));
     }
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_soft_limit_position[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_soft_limit_position[arm_i][i][1]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_soft_limit_velocity[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_soft_limit_velocity[arm_i][i][1]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_soft_limit_torque[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_soft_limit_torque[arm_i][i][1]));
         }
 
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_hard_limit_position[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_hard_limit_position[arm_i][i][1]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_hard_limit_velocity[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_hard_limit_velocity[arm_i][i][1]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_hard_limit_torque[arm_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_hard_limit_torque[arm_i][i][1]));
         }
 
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_follow_limit_position[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_follow_limit_velocity[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_follow_limit_torque[arm_i][i]));
         }
 
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_jump_limit_position[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_jump_limit_velocity[arm_i][i]));
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->arm_jump_limit_torque[arm_i][i]));
         }
     }
 
     for (int gri_i = 0; gri_i < state->GripperSize; gri_i++){
-        for (i = 0; i < state->GripperJointSize[gri_i]; ++ i){
+        for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->gripper_soft_limit_position[gri_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->gripper_soft_limit_position[gri_i][i][1]));
         }
-        for (i = 0; i < state->GripperJointSize[gri_i]; ++ i){
+        for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->gripper_hard_limit_position[gri_i][i][0]));
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->gripper_hard_limit_position[gri_i][i][1]));
         }
@@ -474,62 +469,61 @@ void CuarmMessageHandler::unpack_planner_state(PlannerState* state, char* receiv
     scan_type<SystemState, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), state->system_state);
     scan_type<PlanResult, int>(receive_buffer, index=get_next_data_index(receive_buffer, index), state->plan_result);
     sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%u#", &(state->system_diagnostic_flags));
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%u#", &(state->arm_joint_diagnostic_flags[arm_i][i]));
         }
     }
 }
 
 void CuarmMessageHandler::pack_planner_state(PlannerState* state, char* send_buffer, int buffer_size){
-    int i, j, arm_i;
     memset(send_buffer, 0, buffer_size);
     sprintf(send_buffer, "%ld#", state->received_panel_command_timestamp);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%ld#", state->send_timestamp);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)state->setting_update_finished);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%u#", state->received_sequence_id);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", state->ArmSize);
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
         sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", state->JointSize[arm_i]);
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)state->enabled_joint[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->JointPos[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->JointVel[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->JointTor[arm_i][i]);
         }
 
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->MotorPos[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->MotorVel[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->MotorCur[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->MotorTor[arm_i][i]);
         }
 
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
-            for (j = 0; j < 7; ++ j){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
+            for (int j = 0; j < 7; ++ j){
                 sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->JointPose[arm_i][i][j]);
             }
         }
-        for (j = 0; j < 7; ++ j){
+        for (int j = 0; j < 7; ++ j){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->EEPose[arm_i][j]);
         }
-        for (j = 0; j < 7; ++ j){
+        for (int j = 0; j < 7; ++ j){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->ToolPose[arm_i][j]);
         }
         
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->interpolated_target[arm_i][i]);
         }
     }
@@ -538,67 +532,67 @@ void CuarmMessageHandler::pack_planner_state(PlannerState* state, char* send_buf
     sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", state->GripperSize);
     for (int gri_i = 0; gri_i < state->GripperSize; gri_i++){
         sprintf(&(send_buffer[strlen(send_buffer)]), "%hhd#", state->GripperJointSize[gri_i]);
-        for (i = 0; i < state->GripperJointSize[gri_i]; ++ i){
+        for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->GripperJointPos[gri_i][i]);
         }
     }
 
     //Config setting
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
         sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->tool_offset[arm_i][0]);
         sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->tool_offset[arm_i][1]);
         sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->tool_offset[arm_i][2]);
     }
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_soft_limit_position[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_soft_limit_position[arm_i][i][1]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_soft_limit_velocity[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_soft_limit_velocity[arm_i][i][1]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_soft_limit_torque[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_soft_limit_torque[arm_i][i][1]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_hard_limit_position[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_hard_limit_position[arm_i][i][1]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_hard_limit_velocity[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_hard_limit_velocity[arm_i][i][1]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_hard_limit_torque[arm_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_hard_limit_torque[arm_i][i][1]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_follow_limit_position[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_follow_limit_velocity[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_follow_limit_torque[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_jump_limit_position[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_jump_limit_velocity[arm_i][i]);
         }
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->arm_jump_limit_torque[arm_i][i]);
         }
     }
     for (int gri_i = 0; gri_i < state->GripperSize; gri_i++){
-        for (i = 0; i < state->GripperJointSize[gri_i]; ++ i){
+        for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->gripper_soft_limit_position[gri_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->gripper_soft_limit_position[gri_i][i][1]);
         }
-        for (i = 0; i < state->GripperJointSize[gri_i]; ++ i){
+        for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->gripper_hard_limit_position[gri_i][i][0]);
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->gripper_hard_limit_position[gri_i][i][1]);
         }
@@ -607,8 +601,8 @@ void CuarmMessageHandler::pack_planner_state(PlannerState* state, char* send_buf
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)state->system_state);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%d#", (int)state->plan_result);
     sprintf(&(send_buffer[strlen(send_buffer)]), "%u#", state->system_diagnostic_flags);
-    for (arm_i = 0; arm_i < state->ArmSize; arm_i++){
-        for (i = 0; i < state->JointSize[arm_i]; ++ i){
+    for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
+        for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%u#", state->arm_joint_diagnostic_flags[arm_i][i]);
         }
     }

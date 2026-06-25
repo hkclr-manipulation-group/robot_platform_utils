@@ -1,1 +1,4 @@
-cpp/build
+cpp/build/
+.vscode/
+build/
+*.pdb
