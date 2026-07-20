@@ -47,6 +47,10 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
     cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH PARENT_DIR)
     cmake_path(GET PARENT_DIR PARENT_PATH PARENT_PARENT_DIR)
     
+    find_package(OpenSSL REQUIRED)
+    find_package(ZLIB REQUIRED)
+    find_package(Eigen3 REQUIRED)
+
     find_package(yaml-cpp REQUIRED
         PATHS $ENV{LIBRARY_PATH}
         PATH_SUFFIXES "lib/cmake/yaml-cpp" "lib/cmake" "cmake/yaml-cpp"
@@ -65,22 +69,25 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
         add_subdirectory("${PARENT_PARENT_DIR}/curi_tcp/c" "${CMAKE_BINARY_DIR}/curi_tcp")
     endif()
 
-    file(GLOB LIB_SOURCES "src/*.cpp")
-    set(LIB_SOURCES
-        ${LIB_SOURCES}
-    )
+    # CONFIGURE_DEPENDS: re-scan when sources are added/removed (avoids stale GLOB).
+    file(GLOB LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
     add_library(robot_platform_utils ${LIB_SOURCES})
     add_library(robot::platform_utils ALIAS robot_platform_utils)
     target_link_libraries(robot_platform_utils PUBLIC 
         ${yaml_library}
+        OpenSSL::Crypto 
+        ZLIB::ZLIB
         curi::udp
         curi::tcp
+        Eigen3::Eigen
     )
     
     target_include_directories(robot_platform_utils PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${PARENT_PARENT_DIR}>
+        ${OpenSSL_INCLUDE_DIR}
+        ${ZLIB_INCLUDE_DIRS}
     )
 endif()
 
@@ -122,13 +129,12 @@ if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_CPP_TESTS)
     
     set(TEST_NAMES 
         test_config_loader 
-        # test_mcast_client1 
-        # test_mcast_client2 
-        # test_mcast_priority_server
         test_cuarm_tcp_server
         test_cuarm_tcp_client
         test_cuarm_udp_server
         test_cuarm_udp_client
+        test_mcast_client1
+        test_mcast_client2
     )
 
     foreach(test_target ${TEST_NAMES})

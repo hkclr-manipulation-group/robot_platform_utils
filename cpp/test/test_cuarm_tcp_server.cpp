@@ -14,6 +14,8 @@
 
 namespace {
 
+using namespace robot::platform;
+
 struct TcpTestCommand {
     char message[128];
 };

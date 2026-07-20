@@ -1,6 +1,8 @@
 #include <iostream>
 #include "config_loader.h"
 
+using namespace robot::platform;
+
 int main() {
     std::string project_root_path = PROJECT_ROOT_DIR;
     std::string config_path = project_root_path + "/cuarm_configuration/dual_v2_1/config.yaml";

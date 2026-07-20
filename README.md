@@ -229,3 +229,6 @@ Parent projects must satisfy the same yaml-cpp dependency (and provide `curi_udp
 | `curi_udp` / `curi_tcp` not found | Clone both repos as siblings of `robot_platform_utils` |
 | Python module not importable | Check `python/lib/<arch>/` for the built `.so` / `.pyd` and add it to `PYTHONPATH` |
 | Wrong architecture output folder | Reconfigure from a clean build directory on the target platform |
+
+
+sudo apt install -y libssl-dev zlib1g-dev

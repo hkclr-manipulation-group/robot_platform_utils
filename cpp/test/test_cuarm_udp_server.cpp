@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -16,19 +17,28 @@
 
 namespace {
 
+using namespace robot::platform;
+
 struct UdpTestMessage {
     char message[128];
 };
 
-void pack_message(UdpTestMessage* message, char* send_buffer, int buffer_size)
+bool pack_message(const UdpTestMessage& message, std::uint8_t* send_buffer, std::size_t buffer_size, std::size_t& written_size)
 {
-    std::snprintf(send_buffer, buffer_size, "%s", message->message);
+    if (buffer_size == 0) {
+        return false;
+    }
+    written_size = static_cast<std::size_t>(
+        std::snprintf(reinterpret_cast<char*>(send_buffer), buffer_size, "%s", message.message));
+    return written_size > 0 && written_size < buffer_size;
 }
 
-void unpack_message(UdpTestMessage* message, char* receive_buffer)
+bool unpack_message(const std::uint8_t* receive_buffer, std::size_t size, UdpTestMessage& message)
 {
-    std::strncpy(message->message, receive_buffer, 127);
-    message->message[127] = '\0';
+    const std::size_t copy_size = size < 127 ? size : 127;
+    std::memcpy(message.message, receive_buffer, copy_size);
+    message.message[copy_size] = '\0';
+    return true;
 }
 
 std::atomic<bool> stop_requested(false);
@@ -50,7 +60,6 @@ int main()
     const std::string kRemoteIP = "127.0.0.1";
     constexpr int kLocalPort = 30002;
     constexpr int kRemotePort = 30003;
-    constexpr int kBufferSize = 1024;
     constexpr int kReceiveTimeoutUsec = 200000;
     constexpr auto kSendInterval = std::chrono::seconds(1);
 
@@ -61,8 +70,7 @@ int main()
             kRemoteIP,
             kRemotePort,
             unpack_message,
-            pack_message,
-            kBufferSize);
+            pack_message);
 
         std::cout << "Initializing UDP Server on " << kLocalIP << ":" << kLocalPort
                   << " (remote " << kRemoteIP << ":" << kRemotePort << ")..." << std::endl;
@@ -73,12 +81,12 @@ int main()
 
         while (!stop_requested) {
             UdpTestMessage incoming{};
-            if (server.receive(&incoming, kReceiveTimeoutUsec)) {
+            if (server.receive(incoming, kReceiveTimeoutUsec)) {
                 std::cout << "Received: " << incoming.message << std::endl;
 
                 UdpTestMessage reply{};
                 std::snprintf(reply.message, sizeof(reply.message), "SERVER_ACK: %s", incoming.message);
-                server.send(&reply);
+                server.send(reply);
                 std::cout << "Sent: " << reply.message << std::endl;
             }
 
@@ -86,7 +94,7 @@ int main()
             if (now - last_send_time >= kSendInterval) {
                 UdpTestMessage outgoing{};
                 std::snprintf(outgoing.message, sizeof(outgoing.message), "SERVER_HEARTBEAT #%d", ++send_count);
-                server.send(&outgoing);
+                server.send(outgoing);
                 std::cout << "Sent: " << outgoing.message << std::endl;
                 last_send_time = now;
             }

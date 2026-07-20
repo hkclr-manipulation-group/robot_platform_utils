@@ -25,27 +25,29 @@
     #include <sys/time.h>
 #endif
 
-void sleep_period(int sleep_time_in_us)
-{
-    if (sleep_time_in_us < 0)
-        return;
-#if defined(_WIN32) || defined(WIN32)
-    std::this_thread::sleep_for(std::chrono::microseconds(sleep_time_in_us));
-#else
-    struct timespec ts;
-    ts.tv_sec = sleep_time_in_us / 1000000L;
-    ts.tv_nsec = (sleep_time_in_us % 1000000L) * 1000L;
-    clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
-#endif
-}
-
-long get_time_now(){
-    #ifdef KERNEL_XENOMAI
-        RTIME now = rt_timer_read();
-        return now / 1000;
-    #else // preempt_rt, linux & windows
-        struct timeval t;
-        gettimeofday(&t, NULL);
-        return t.tv_sec * 1000000 + t.tv_usec;
+namespace robot::platform {
+    void sleep_period(int sleep_time_in_us)
+    {
+        if (sleep_time_in_us < 0)
+            return;
+    #if defined(_WIN32) || defined(WIN32)
+        std::this_thread::sleep_for(std::chrono::microseconds(sleep_time_in_us));
+    #else
+        struct timespec ts;
+        ts.tv_sec = sleep_time_in_us / 1000000L;
+        ts.tv_nsec = (sleep_time_in_us % 1000000L) * 1000L;
+        clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
     #endif
+    }
+
+    long get_time_now(){
+        #ifdef KERNEL_XENOMAI
+            RTIME now = rt_timer_read();
+            return now / 1000;
+        #else // preempt_rt, linux & windows
+            struct timeval t;
+            gettimeofday(&t, NULL);
+            return t.tv_sec * 1000000 + t.tv_usec;
+        #endif
+    }
 }
