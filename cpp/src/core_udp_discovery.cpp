@@ -1,4 +1,4 @@
-#include "mcast_server_discovery.h"
+#include "core_udp_discovery.h"
 
 #include <cstring>
 #include <iostream>
@@ -14,6 +14,7 @@
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+typedef unsigned long in_addr_t; 
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -183,7 +184,7 @@ DiscoveredServer discoverRtServerViaHandshake(
             DiscoveredServer out;
             out.server_ip = sockaddrToIp(peer);
             out.session_id = res.assigned_session_id;
-            // Prefer a unicast peer address for later McastClient traffic.
+            // Prefer a unicast peer address for later CoreUdpClient traffic.
             if (isMulticastIp(out.server_ip) || isLimitedBroadcast(out.server_ip)) {
                 std::cout << "discoverRtServerViaHandshake: warning: peer address "
                           << out.server_ip << " is not unicast\n";

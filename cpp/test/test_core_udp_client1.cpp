@@ -8,7 +8,7 @@
 #include <string>
 
 #include "client_keys.h"
-#include "mcast_client.h"
+#include "core_udp_client.h"
 #include "platform_serialization.h"
 #include "time_utils.h"
 
@@ -16,12 +16,12 @@ namespace {
 
 using namespace robot::platform;
 
-constexpr uint16_t kClientId = 10002;
+constexpr uint16_t kClientId = 10001;
 const std::string kServerIp = "127.0.0.1";
 const std::string kMulticastIp = "239.255.77.88";
 constexpr int kServerPort = 30200;
 constexpr int kMulticastPort = 30201;
-constexpr int kReceiveAckPort = 40002;
+constexpr int kReceiveAckPort = 40001;
 constexpr int kReceiveTimeoutUs = 200000;
 constexpr float kAckPollMs = 10.0f;
 
@@ -59,7 +59,7 @@ bool unpack_core_response(const std::uint8_t* buffer, std::size_t size, CoreResp
     return true;
 }
 
-uint32_t perform_handshake(McastClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client) {
+uint32_t perform_handshake(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client) {
     constexpr uint16_t handshake_seq = 1;
     constexpr int kMaxAttempts = 3;
     
@@ -87,7 +87,7 @@ uint32_t perform_handshake(McastClient<SrvState, CoreRequestVariantPtr, CoreResp
                 throw std::runtime_error("Handshake rejected, status: " + enumToString(handshake_res.payload.status));
             }
 
-            std::cout << "Client 10002 handshake success on attempt " << attempt 
+            std::cout << "Client 10001 handshake success on attempt " << attempt 
                       << ", session_id=" << handshake_res.assigned_session_id << std::endl;
             
             return handshake_res.assigned_session_id;
@@ -95,15 +95,15 @@ uint32_t perform_handshake(McastClient<SrvState, CoreRequestVariantPtr, CoreResp
         } catch (const std::runtime_error& e) {
             std::cerr << "Attempt " << attempt << " failed: " << e.what() << std::endl;
             if (attempt == kMaxAttempts) {
-                throw std::runtime_error("Handshake failed after 10 attempts for client 10002");
+                throw std::runtime_error("Handshake failed after 10 attempts for client 10001");
             }
             // Optional: Add std::this_thread::sleep_for here to back off before retrying
         }
     }
-    throw std::runtime_error("Handshake failed for client 10002");
+    throw std::runtime_error("Handshake failed for client 10001");
 }
 
-void send_demo_config(McastClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client, uint32_t session_id, uint32_t sequence_id, bool read_only)
+void send_demo_config(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client, uint32_t session_id, uint32_t sequence_id, bool read_only)
 {
     SdkConfigReq config{};
     config.client_id = kClientId;
@@ -116,7 +116,7 @@ void send_demo_config(McastClient<SrvState, CoreRequestVariantPtr, CoreResponseV
 
     CoreResponseVariantPtr ack = client.waitAck(kClientId, sequence_id, 3000.0f);
     if (!ack) {
-        throw std::runtime_error("Config ack timed out for client 10002");
+        throw std::runtime_error("Config ack timed out for client 10001");
     }
 
     if (!std::holds_alternative<SdkConfigRes>(*ack)) {
@@ -124,11 +124,11 @@ void send_demo_config(McastClient<SrvState, CoreRequestVariantPtr, CoreResponseV
     }
 
     const auto& config_res = std::get<SdkConfigRes>(*ack);
-    std::cout << "Client 10002 config response status="
+    std::cout << "Client 10001 config response status="
               << enumToString(config_res.payload.status) << std::endl;
 }
 
-void send_demo_command(McastClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client, uint32_t session_id, uint32_t sequence_id)
+void send_demo_command(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client, uint32_t session_id, uint32_t sequence_id)
 {
     SdkCommandReq command{};
     command.client_id = kClientId;
@@ -149,7 +149,7 @@ void send_demo_command(McastClient<SrvState, CoreRequestVariantPtr, CoreResponse
 
     CoreResponseVariantPtr ack = client.waitAck(kClientId, sequence_id, 3000.0f);
     if (!ack) {
-        throw std::runtime_error("Command ack timed out for client 10002");
+        throw std::runtime_error("Command ack timed out for client 10001");
     }
 
     if (!std::holds_alternative<SdkCommandRes>(*ack)) {
@@ -157,7 +157,7 @@ void send_demo_command(McastClient<SrvState, CoreRequestVariantPtr, CoreResponse
     }
 
     const auto& command_res = std::get<SdkCommandRes>(*ack);
-    std::cout << "Client 10002 command response status="
+    std::cout << "Client 10001 command response status="
               << enumToString(command_res.payload.status) << std::endl;
 }
 
@@ -178,7 +178,7 @@ int main()
             throw std::runtime_error("Failed to load client keys from " + keys_path);
         }
 
-        McastClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr> client(
+        CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr> client(
             kServerIp,
             kServerPort,
             kMulticastIp,
@@ -189,11 +189,14 @@ int main()
             unpack_core_response,
             kAckPollMs);
 
-        std::cout << "Client 10002 connected to server " << kServerIp << ":" << kServerPort
+        std::cout << "Client 10001 connected to server " << kServerIp << ":" << kServerPort
                   << ", multicast " << kMulticastIp << ":" << kMulticastPort << std::endl;
 
         std::cout << "Perform handshake." << std::endl;
         const uint32_t session_id = perform_handshake(client);
+        std::cout << "--------------------------------" << std::endl;
+        std::cout << "Send demo command." << std::endl;
+        send_demo_command(client, session_id, sequence_id++);
         std::cout << "--------------------------------" << std::endl;
         std::cout << "Send demo config, read_only=true." << std::endl;
         send_demo_config(client, session_id, sequence_id++, true);
@@ -207,18 +210,18 @@ int main()
 
         while (!stop_requested) {
             send_demo_command(client, session_id, sequence_id++);
-            
+
             SrvState state{};
             if (client.receive(state, kReceiveTimeoutUs)) {
-                std::cout << "Client 10002 received SrvState seq=" << state.sequence_id
+                std::cout << "Client 10001 received SrvState seq=" << state.sequence_id
                           << " system_state=" << enumToString(state.payload.system_state) << std::endl;
             }
         }
 
         client.close();
-        std::cout << "Client 10002 closed." << std::endl;
+        std::cout << "Client 10001 closed." << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "Client 10002 error: " << e.what() << std::endl;
+        std::cerr << "Client 10001 error: " << e.what() << std::endl;
         return 1;
     }
 

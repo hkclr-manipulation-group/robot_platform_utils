@@ -1,5 +1,5 @@
-#ifndef MCAST_SERVER_DISCOVERY_H
-#define MCAST_SERVER_DISCOVERY_H
+#ifndef CORE_UDP_DISCOVERY_H
+#define CORE_UDP_DISCOVERY_H
 
 #include <cstdint>
 #include <string>
@@ -21,13 +21,13 @@ struct DiscoveredServer {
  * same-host panel+RT discovery fails with global broadcast.
  *
  * @param client_id         Panel / SDK client id (HMAC + session bookkeeping).
- * @param core_request_port Destination UDP port (same as McastServer local_port).
- * @param local_ack_port    Local bind port for the handshake reply (same as McastClient ack port).
+ * @param core_request_port Destination UDP port (same as CoreUdpServer local_port).
+ * @param local_ack_port    Local bind port for the handshake reply (same as CoreUdpClient ack port).
  * @param probe_ips         Unicast, multicast, and/or 255.255.255.255 targets.
  * @param timeout_ms        Per-attempt wait for SdkHandshakeRes.
  * @param max_attempts_per_probe Retries per probe IP before moving on.
  *
- * Closes its temporary socket before returning so McastClient can bind local_ack_port.
+ * Closes its temporary socket before returning so CoreUdpClient can bind local_ack_port.
  */
 DiscoveredServer discoverRtServerViaHandshake(
     uint16_t client_id,
