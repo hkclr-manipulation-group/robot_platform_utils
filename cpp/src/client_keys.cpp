@@ -78,8 +78,8 @@ bool loadClientKeys(const std::string& json_path) {
 
         next.loaded = true;
         keyStore() = std::move(next);
-        std::cout << "Loaded client keys from " << json_path
-                  << " (" << keyStore().registry.size() << " entries)\n";
+        // std::cout << "Loaded client keys from " << json_path
+        //           << " (" << keyStore().registry.size() << " entries)\n";
         return true;
     } catch (const std::exception& e) {
         std::cerr << "loadClientKeys failed for " << json_path << ": " << e.what() << std::endl;

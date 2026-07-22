@@ -133,10 +133,10 @@ DiscoveredServer discoverRtServerViaHandshake(
         }
         tried << probe_ip;
 
-        if (isLimitedBroadcast(probe_ip)) {
-            std::cout << "discoverRtServerViaHandshake: note: 255.255.255.255 often fails "
-                         "for same-host (no broadcast loopback); prefer multicast probe\n";
-        }
+        // if (isLimitedBroadcast(probe_ip)) {
+        //     std::cout << "discoverRtServerViaHandshake: note: 255.255.255.255 often fails "
+        //                  "for same-host (no broadcast loopback); prefer multicast probe\n";
+        // }
 
         for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
             handshake.timestamp_us = static_cast<uint64_t>(get_time_now());
