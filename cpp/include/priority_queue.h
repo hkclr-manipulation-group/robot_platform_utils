@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <iostream>
+#include <algorithm>
 
 namespace robot::platform {
     template <typename T>
@@ -37,20 +38,24 @@ namespace robot::platform {
             void clear();
             size_t size() const;
             void print() const;
+            void removeById(int target_id);
         private:
-            std::priority_queue<std::unique_ptr<QueueData>, std::vector<std::unique_ptr<QueueData>>, QueueDataCompare> queue_;
+            std::vector<std::unique_ptr<QueueData>> queue_;
     };
 
     template <typename T>
     void PriorityQueue<T>::push(std::unique_ptr<QueueData> data){
-        queue_.push(std::move(data));
+        queue_.push_back(std::move(data));
+        // Keeps the vector arranged as a max-heap
+        std::push_heap(queue_.begin(), queue_.end(), QueueDataCompare());
     }
 
     template <typename T>
     std::unique_ptr<typename PriorityQueue<T>::QueueData> PriorityQueue<T>::pop(){
         if (queue_.empty()) return nullptr;
-        std::unique_ptr<QueueData> top = std::move(const_cast<std::unique_ptr<QueueData>&>(queue_.top()));
-        queue_.pop();
+        std::pop_heap(queue_.begin(), queue_.end(), QueueDataCompare());
+        std::unique_ptr<QueueData> top = std::move(queue_.back());
+        queue_.pop_back();
         return top;
     }
 
@@ -61,7 +66,7 @@ namespace robot::platform {
 
     template <typename T>
     void PriorityQueue<T>::clear(){
-        queue_ = std::priority_queue<std::unique_ptr<QueueData>, std::vector<std::unique_ptr<QueueData>>, QueueDataCompare>();
+        queue_.clear();
     }
 
     template <typename T>
@@ -71,14 +76,44 @@ namespace robot::platform {
 
     template <typename T>
     void PriorityQueue<T>::print() const{
-        std::priority_queue<std::unique_ptr<QueueData>, std::vector<std::unique_ptr<QueueData>>, QueueDataCompare> temp_queue = queue_;
-        int queue_order = 0;
-        while (!temp_queue.empty()){
-            std::unique_ptr<QueueData> qd = std::move(temp_queue.top());
-            std::cout << "queue order: " << queue_order << " id: " << qd->id << " priority: " << qd->priority << " seq: " << qd->seq << " received_at: " << qd->received_at << std::endl;
-            queue_order++;
-            temp_queue.pop();
+        if (queue_.empty()) {
+            std::cout << "Queue is empty." << std::endl;
+            return;
         }
+        std::vector<const QueueData*> temp_ptrs;
+        temp_ptrs.reserve(queue_.size());
+        for (const auto& item : queue_) {
+            temp_ptrs.push_back(item.get());
+        }
+        std::sort(temp_ptrs.begin(), temp_ptrs.end(), [](const QueueData* lhs, const QueueData* rhs) {
+            if (lhs->priority != rhs->priority) return lhs->priority > rhs->priority; 
+            if (lhs->seq != rhs->seq) return lhs->seq > rhs->seq; 
+            return lhs->received_at > rhs->received_at; 
+        });
+        int queue_order = 0;
+        for (const auto* qd : temp_ptrs) {
+            std::cout << "queue order: " << queue_order 
+                      << " id: " << qd->id 
+                      << " priority: " << qd->priority 
+                      << " seq: " << qd->seq 
+                      << " received_at: " << qd->received_at << std::endl;
+            queue_order++;
+        }
+    }
+
+    template <typename T>
+    void PriorityQueue<T>::removeById(int target_id) {
+        if (queue_.empty()) return;
+        queue_.erase(
+            std::remove_if(queue_.begin(), queue_.end(), 
+                [target_id](const std::unique_ptr<QueueData>& item) {
+                    return item->id == target_id;
+                }
+            ), 
+            queue_.end()
+        );
+
+        std::make_heap(queue_.begin(), queue_.end(), QueueDataCompare());
     }
 
 } // namespace robot::platform

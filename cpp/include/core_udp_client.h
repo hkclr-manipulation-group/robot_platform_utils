@@ -50,6 +50,7 @@ namespace robot::platform {
             bool receive(UnpackT& data, int timeout_us);
             AckT waitAck(uint16_t client_id, uint32_t sequence_id, float timeout_ms);
             void close();
+            CommandResponseStatus getLastStatus() const;
 
         private:
             void ackThreadTask(int ack_dt_us);
@@ -69,6 +70,7 @@ namespace robot::platform {
             std::thread ack_thread_;
             AckT ack_data_;
             int ack_dt_us_ = 0;
+            CommandResponseStatus last_status_ = CommandResponseStatus::kSuccess;
     };
 
     namespace core_udp_client_detail {
@@ -83,9 +85,8 @@ namespace robot::platform {
         template<typename AckT>
         bool ackMatches(const AckT& ack, uint16_t client_id, uint32_t sequence_id) {
             if constexpr (std::is_same_v<AckT, robot::platform::CoreResponseVariantPtr>) {
-                if (!ack) {
-                    return false;
-                }
+                if (!ack) return false;
+
                 return std::visit([&](const auto& alt) -> bool {
                     using T = std::decay_t<decltype(alt)>;
                     if constexpr (std::is_same_v<T, std::monostate>) {
@@ -132,6 +133,26 @@ namespace robot::platform {
             }
         }
 
+        template<typename AckT>
+        bool extractStatus(const AckT& ack, CommandResponseStatus& status) {
+            using CleanAckT = std::decay_t<AckT>;
+            if constexpr (std::is_same_v<CleanAckT, robot::platform::CoreResponseVariantPtr>) {
+                if (!ack) return false;
+
+                return std::visit([&](const auto& variant_item) -> bool {
+                    using T = std::decay_t<decltype(variant_item)>;
+                    
+                    if constexpr (std::is_same_v<T, std::monostate>) {
+                        return false;
+                    } else {
+                        status = variant_item.payload.status;
+                        return true;
+                    }
+                }, *ack);
+            } else {
+                return false;
+            }
+        }
     }  // namespace core_udp_client_detail
 
     template <typename UnpackT, typename PackT, typename AckT>
@@ -239,6 +260,12 @@ namespace robot::platform {
         }
     }
 
+    
+    template <typename UnpackT, typename PackT, typename AckT>
+    CommandResponseStatus CoreUdpClient<UnpackT, PackT, AckT>::getLastStatus() const{
+        return last_status_;
+    }
+
     template <typename UnpackT, typename PackT, typename AckT>
     void CoreUdpClient<UnpackT, PackT, AckT>::ackThreadTask(int ack_dt_us){
         while (is_running_) {
@@ -249,16 +276,7 @@ namespace robot::platform {
                     std::lock_guard<std::mutex> lock(ack_mutex_);
                     ack_data_ = AckT{};
                     ack_unpack_function_(send_udp_node_ptr_->receive_buffer, written_buffer_size, ack_data_);
-                    
-                    if (auto* cmd_res = std::get_if<SdkCommandRes>(ack_data_.get())) {
-                        if (cmd_res->payload.status != CommandResponseStatus::kSuccess) {
-                            std::cout << "CoreUdpClient SdkCommandRes status: " << enumToString(cmd_res->payload.status) << "\n";
-                        }
-                    }else if (auto* cfg_res = std::get_if<SdkConfigRes>(ack_data_.get())) {
-                        if (cfg_res->payload.status != CommandResponseStatus::kSuccess) {
-                            std::cout << "CoreUdpClient SdkConfigRes status: " << enumToString(cfg_res->payload.status) << "\n";
-                        }
-                    }
+                    bool success = core_udp_client_detail::extractStatus(ack_data_, last_status_);
                 }
                 ack_cv_.notify_one(); 
             }

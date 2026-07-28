@@ -84,7 +84,7 @@ namespace robot::platform {
     };
 
     enum class SystemState : uint8_t {
-        kUnknown         = 0,          // Safety fallback
+        kUnknown        = 0, // Safety fallback
         kStartup        = 1,
         kIdle           = 2, // Completely stationary; safe to accept new paths
         kMoving         = 3, // Actively running an interpolator, velocity command, or jog stream
@@ -148,7 +148,10 @@ namespace robot::platform {
         constexpr uint64_t kControlStrategyNotAvailable           = 1ULL << 34; // Control strategy is not available
         constexpr uint64_t kWaypointControlStrategyNotAllowed     = 1ULL << 35; // Waypoint control strategy is invalid
         constexpr uint64_t kWaypointTargetTypeNotAllowed          = 1ULL << 36; // Waypoint target type is invalid
-        constexpr uint64_t kPlaybackControlRequirePositionTarget   = 1ULL << 37; // Playback control require position target
+        constexpr uint64_t kWaypointSmoothingMethodNotAllowed     = 1ULL << 37; // Waypoint smoothing method is invalid
+        constexpr uint64_t kPlaybackControlRequirePositionTarget  = 1ULL << 38; // Playback control require position target
+        constexpr uint64_t kPlaybackControlStartPoseNotReachable  = 1ULL << 39; // Playback control cannot reach start pose
+
         constexpr uint64_t kUnknown                               = 1ULL << 63;
     };
 
@@ -165,6 +168,7 @@ namespace robot::platform {
         kInvalidSessionId           = 8, // Session ID expired, unauthenticated, or mismatched
         kInvalidConfig              = 9, // Configuration is invalid
         kTimeout                    = 10, // Configuration update timed out
+        kUnknown                    = 255
     };
 
     enum class MessageType: uint8_t{
@@ -177,6 +181,10 @@ namespace robot::platform {
         kSdkSafeguardReq,
         kSdkHandshakeReq,
         kSdkHandshakeRes,
+        kSdkReleaseControlReq,
+        kSdkReleaseControlRes,
+        kSdkRecoveryReq,
+        kSdkRecoveryRes,
     };
     
 
@@ -410,7 +418,7 @@ namespace robot::platform {
     struct SdkHandshakeReq { //For client to request a session id from the server
         uint32_t magic_header = MAGIC_HEADER; 
         uint16_t client_id;                   
-        uint16_t sequence_id;                 // Anti-replay counter
+        uint32_t sequence_id;                 // Anti-replay counter
         uint64_t timestamp_us;                // Integrity timestamp
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };
@@ -418,6 +426,7 @@ namespace robot::platform {
     struct SdkHandshakeRes { //For server to respond with a session id to the client
         uint32_t magic_header = MAGIC_HEADER;
         uint16_t request_client_id;
+        uint32_t request_sequence_id;
         uint64_t request_received_us;
         uint64_t response_sent_us;
         uint32_t assigned_session_id;
@@ -430,8 +439,56 @@ namespace robot::platform {
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };
 
-    using CoreRequestVariant = std::variant<std::monostate, SdkCommandReq, SdkConfigReq, SdkHandshakeReq>;
-    using CoreResponseVariant = std::variant<std::monostate, SdkCommandRes, SdkConfigRes, SdkHandshakeRes>;
+    struct SdkReleaseControlReq {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t client_id;
+        uint32_t session_id;          
+        uint32_t sequence_id;                 // Anti-replay counter
+        uint64_t timestamp_us;                // Integrity timestamp
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+    
+    struct SdkReleaseControlRes {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t request_client_id;
+        uint32_t request_sequence_id;
+        uint64_t request_received_us;
+        uint64_t response_sent_us;
+
+        // --- Payload Block ---
+        struct {
+            CommandResponseStatus status;
+        }payload;
+        
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+
+    struct SdkRecoveryReq {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t client_id;
+        uint32_t session_id;                   
+        uint32_t sequence_id;                 // Anti-replay counter
+        uint64_t timestamp_us;                // Integrity timestamp
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+    
+    struct SdkRecoveryRes {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t request_client_id;
+        uint32_t request_sequence_id;
+        uint64_t request_received_us;
+        uint64_t response_sent_us;
+
+        // --- Payload Block ---
+        struct {
+            CommandResponseStatus status;
+        }payload;
+        
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+    
+    using CoreRequestVariant = std::variant<std::monostate, SdkCommandReq, SdkConfigReq, SdkHandshakeReq, SdkReleaseControlReq, SdkRecoveryReq>;
+    using CoreResponseVariant = std::variant<std::monostate, SdkCommandRes, SdkConfigRes, SdkHandshakeRes, SdkReleaseControlRes, SdkRecoveryRes>;
     using MonitoringRequestVariant = std::variant<std::monostate, SdkHeartbeatReq, SdkSafeguardReq>;
     using CoreRequestVariantPtr = std::unique_ptr<CoreRequestVariant>;
     using CoreResponseVariantPtr = std::shared_ptr<CoreResponseVariant>;
@@ -590,6 +647,7 @@ namespace robot::platform {
     void print(const SdkSafeguardReq& value);
     void print(const SrvState& value);
     void print_diagnostic_flags(uint64_t flags);
+    std::pair<std::string, std::string> getStatusErrorMessage(CommandResponseStatus status);
 
     // //Get initial request
     SdkConfigReq getReadOnlyConfigRequest(uint16_t client_id, uint32_t session_id, uint32_t sequence_id);

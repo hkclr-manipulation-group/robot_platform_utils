@@ -190,8 +190,7 @@ DiscoveredServer discoverRtServerViaHandshake(
                           << out.server_ip << " is not unicast\n";
             }
             std::cout << "discoverRtServerViaHandshake: found server " << out.server_ip
-                      << " via probe " << probe_ip
-                      << " session_id=" << out.session_id << "\n";
+                      << " via probe " << probe_ip << "\n";
             return out;
         }
     }

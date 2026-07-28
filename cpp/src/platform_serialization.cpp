@@ -9,10 +9,6 @@
 
 namespace robot::platform::serialization {
     namespace {
-        using CoreRequestVariant = std::variant<std::monostate, SdkCommandReq, SdkConfigReq, SdkHandshakeReq>;
-        using CoreResponseVariant = std::variant<std::monostate, SdkCommandRes, SdkConfigRes, SdkHandshakeRes>;
-        using MonitoringRequestVariant = std::variant<std::monostate, SdkHeartbeatReq, SdkSafeguardReq>;
-
         template <typename T>
         void writeRaw(const T& src, std::uint8_t*& cursor, std::size_t& remaining) {
             if (remaining < sizeof(T)) {
@@ -517,6 +513,7 @@ namespace robot::platform::serialization {
             writeEnum(MessageType::kSdkHandshakeRes, cursor, remaining);
             writeRaw(value.request_client_id, cursor, remaining);
             
+            writeRaw(value.request_sequence_id, cursor, remaining);
             writeRaw(value.request_received_us, cursor, remaining);
             writeRaw(value.response_sent_us, cursor, remaining);
             writeRaw(value.assigned_session_id, cursor, remaining);
@@ -526,6 +523,98 @@ namespace robot::platform::serialization {
 
         }catch (const std::exception& e) {
             catchToBytesError("catchToBytesError:toBytes(SdkHandshakeRes)", e, value, buffer_size, written_size, write_phase);
+            return false;
+        }
+        written_size = cursor - buffer;
+        return true;
+    }
+
+    bool toBytes(const SdkReleaseControlReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        std::uint8_t* cursor = buffer;
+        std::size_t remaining = buffer_size;
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+
+        try{
+            writeRaw(value.magic_header, cursor, remaining);
+            writeEnum(MessageType::kSdkReleaseControlReq, cursor, remaining);
+            writeRaw(value.client_id, cursor, remaining);
+
+            writeRaw(value.session_id, cursor, remaining);
+            writeRaw(value.sequence_id, cursor, remaining);
+            writeRaw(value.timestamp_us, cursor, remaining);
+        }catch (const std::exception& e) {
+            catchToBytesError("catchToBytesError:toBytes(SdkReleaseControlReq)", e, value, buffer_size, written_size, write_phase);
+            return false;
+        }
+
+        written_size = cursor - buffer;
+        return true;
+    }
+
+    bool toBytes(const SdkReleaseControlRes& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        std::uint8_t* cursor = buffer;
+        std::size_t remaining = buffer_size;
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+
+        try{
+            writeRaw(value.magic_header, cursor, remaining);
+            writeEnum(MessageType::kSdkReleaseControlRes, cursor, remaining);
+            writeRaw(value.request_client_id, cursor, remaining);
+            
+            writeRaw(value.request_received_us, cursor, remaining);
+            writeRaw(value.response_sent_us, cursor, remaining);
+
+            writeEnum(value.payload.status, cursor, remaining);
+            write_phase.push_back(std::make_pair("after assigned_session_id", cursor - buffer));
+
+        }catch (const std::exception& e) {
+            catchToBytesError("catchToBytesError:toBytes(SdkReleaseControlRes)", e, value, buffer_size, written_size, write_phase);
+            return false;
+        }
+        written_size = cursor - buffer;
+        return true;
+    }
+
+    bool toBytes(const SdkRecoveryReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        std::uint8_t* cursor = buffer;
+        std::size_t remaining = buffer_size;
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+
+        try{
+            writeRaw(value.magic_header, cursor, remaining);
+            writeEnum(MessageType::kSdkRecoveryReq, cursor, remaining);
+            writeRaw(value.client_id, cursor, remaining);
+
+            writeRaw(value.session_id, cursor, remaining);
+            writeRaw(value.sequence_id, cursor, remaining);
+            writeRaw(value.timestamp_us, cursor, remaining);
+        }catch (const std::exception& e) {
+            catchToBytesError("catchToBytesError:toBytes(SdkRecoveryReq)", e, value, buffer_size, written_size, write_phase);
+            return false;
+        }
+
+        written_size = cursor - buffer;
+        return true;
+    }
+
+    bool toBytes(const SdkRecoveryRes& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        std::uint8_t* cursor = buffer;
+        std::size_t remaining = buffer_size;
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+
+        try{
+            writeRaw(value.magic_header, cursor, remaining);
+            writeEnum(MessageType::kSdkReleaseControlRes, cursor, remaining);
+            writeRaw(value.request_client_id, cursor, remaining);
+            
+            writeRaw(value.request_received_us, cursor, remaining);
+            writeRaw(value.response_sent_us, cursor, remaining);
+
+            writeEnum(value.payload.status, cursor, remaining);
+            write_phase.push_back(std::make_pair("after assigned_session_id", cursor - buffer));
+
+        }catch (const std::exception& e) {
+            catchToBytesError("catchToBytesError:toBytes(SdkRecoveryRes)", e, value, buffer_size, written_size, write_phase);
             return false;
         }
         written_size = cursor - buffer;
@@ -599,6 +688,10 @@ namespace robot::platform::serialization {
             return toBytes(std::get<SdkConfigReq>(variant), buffer, buffer_size, written_size);
         } else if (std::holds_alternative<SdkHandshakeReq>(variant)) {
             return toBytes(std::get<SdkHandshakeReq>(variant), buffer, buffer_size, written_size);
+        } else if (std::holds_alternative<SdkReleaseControlReq>(variant)) {
+            return toBytes(std::get<SdkReleaseControlReq>(variant), buffer, buffer_size, written_size);
+        } else if (std::holds_alternative<SdkRecoveryReq>(variant)) {
+            return toBytes(std::get<SdkRecoveryReq>(variant), buffer, buffer_size, written_size);
         }
         return false;
     }
@@ -614,6 +707,10 @@ namespace robot::platform::serialization {
             return toBytes(std::get<SdkConfigRes>(variant), buffer, buffer_size, written_size);
         } else if (std::holds_alternative<SdkHandshakeRes>(variant)) {
             return toBytes(std::get<SdkHandshakeRes>(variant), buffer, buffer_size, written_size);
+        } else if (std::holds_alternative<SdkReleaseControlRes>(variant)) {
+            return toBytes(std::get<SdkReleaseControlRes>(variant), buffer, buffer_size, written_size);
+        } else if (std::holds_alternative<SdkRecoveryRes>(variant)) {
+            return toBytes(std::get<SdkRecoveryRes>(variant), buffer, buffer_size, written_size);
         }
         return false;
     }
@@ -840,12 +937,73 @@ namespace robot::platform::serialization {
         write_phase.push_back(std::make_pair("after message type", cursor - buffer));
 
         readRaw(cursor, value.request_client_id);
+        readRaw(cursor, value.request_sequence_id);
         readRaw(cursor, value.request_received_us);
         readRaw(cursor, value.response_sent_us);
         readRaw(cursor, value.assigned_session_id);
 
         readEnum(cursor, value.payload.status);
         return verifyReadBuffer("fromBytes(SdkHandshakeRes)", cursor, buffer, buffer_size, write_phase);
+    }
+
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkReleaseControlReq& value){
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+        const std::uint8_t* cursor = buffer;
+        readRaw(cursor, value.magic_header);
+        cursor += sizeof(MessageType); // Skip message type
+        write_phase.push_back(std::make_pair("after message type", cursor - buffer));
+
+        readRaw(cursor, value.client_id);
+        readRaw(cursor, value.session_id);
+        readRaw(cursor, value.sequence_id);
+        readRaw(cursor, value.timestamp_us);
+
+        return verifyReadBuffer("fromBytes(SdkReleaseControlReq)", cursor, buffer, buffer_size, write_phase);
+    }
+
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkReleaseControlRes& value){
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+        const std::uint8_t* cursor = buffer;
+        readRaw(cursor, value.magic_header);
+        cursor += sizeof(MessageType); // Skip message type
+        write_phase.push_back(std::make_pair("after message type", cursor - buffer));
+
+        readRaw(cursor, value.request_client_id);
+        readRaw(cursor, value.request_received_us);
+        readRaw(cursor, value.response_sent_us);
+
+        readEnum(cursor, value.payload.status);
+        return verifyReadBuffer("fromBytes(SdkReleaseControlRes)", cursor, buffer, buffer_size, write_phase);
+    }
+
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkRecoveryReq& value){
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+        const std::uint8_t* cursor = buffer;
+        readRaw(cursor, value.magic_header);
+        cursor += sizeof(MessageType); // Skip message type
+        write_phase.push_back(std::make_pair("after message type", cursor - buffer));
+
+        readRaw(cursor, value.client_id);
+        readRaw(cursor, value.session_id);
+        readRaw(cursor, value.sequence_id);
+        readRaw(cursor, value.timestamp_us);
+
+        return verifyReadBuffer("fromBytes(SdkRecoveryReq)", cursor, buffer, buffer_size, write_phase);
+    }
+
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkRecoveryRes& value){
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+        const std::uint8_t* cursor = buffer;
+        readRaw(cursor, value.magic_header);
+        cursor += sizeof(MessageType); // Skip message type
+        write_phase.push_back(std::make_pair("after message type", cursor - buffer));
+
+        readRaw(cursor, value.request_client_id);
+        readRaw(cursor, value.request_received_us);
+        readRaw(cursor, value.response_sent_us);
+
+        readEnum(cursor, value.payload.status);
+        return verifyReadBuffer("fromBytes(SdkRecoveryRes)", cursor, buffer, buffer_size, write_phase);
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SrvState& value) {
@@ -916,6 +1074,12 @@ namespace robot::platform::serialization {
         }else if (message_type == MessageType::kSdkHandshakeReq) {
             auto& req_ref = value->emplace<SdkHandshakeReq>();
             parse_success = fromBytes(buffer, buffer_size, req_ref);
+        }else if (message_type == MessageType::kSdkReleaseControlReq) {
+            auto& req_ref = value->emplace<SdkReleaseControlReq>();
+            parse_success = fromBytes(buffer, buffer_size, req_ref);
+        }else if (message_type == MessageType::kSdkRecoveryReq) {
+            auto& req_ref = value->emplace<SdkRecoveryReq>();
+            parse_success = fromBytes(buffer, buffer_size, req_ref);
         }
         if (!parse_success) value = nullptr; 
         return parse_success;
@@ -938,6 +1102,12 @@ namespace robot::platform::serialization {
             parse_success = fromBytes(buffer, buffer_size, res_ref);
         }else if (message_type == MessageType::kSdkHandshakeRes) {
             auto& res_ref = value->emplace<SdkHandshakeRes>();
+            parse_success = fromBytes(buffer, buffer_size, res_ref);
+        }else if (message_type == MessageType::kSdkReleaseControlRes) {
+            auto& res_ref = value->emplace<SdkReleaseControlRes>();
+            parse_success = fromBytes(buffer, buffer_size, res_ref);
+        }else if (message_type == MessageType::kSdkRecoveryRes) {
+            auto& res_ref = value->emplace<SdkRecoveryRes>();
             parse_success = fromBytes(buffer, buffer_size, res_ref);
         }
         if (!parse_success) value = nullptr; 

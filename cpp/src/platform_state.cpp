@@ -257,9 +257,52 @@ namespace robot::platform {
         std::cout << "SdkHandshakeRes\n";
         std::cout << "  magic_header: " << value.magic_header << "\n";
         std::cout << "  request_client_id: " << value.request_client_id << "\n";
+        std::cout << "  request_sequence_id: " << value.request_sequence_id << "\n";
         std::cout << "  request_received_us: " << value.request_received_us << "\n";
         std::cout << "  response_sent_us: " << value.response_sent_us << "\n";
         std::cout << "  assigned_session_id: " << value.assigned_session_id << "\n";
+        std::cout << "  payload.status: " << enumToString(value.payload.status) << "\n";
+        std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
+    }
+
+    void print(const SdkReleaseControlReq& value){
+        std::cout << "SdkReleaseControlReq\n";
+        std::cout << "  magic_header: " << value.magic_header << "\n";
+        std::cout << "  client_id: " << value.client_id << "\n";
+        std::cout << "  session_id: " << value.session_id << "\n";
+        std::cout << "  sequence_id: " << value.sequence_id << "\n";
+        std::cout << "  timestamp_us: " << value.timestamp_us << "\n";
+        std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
+    }
+
+    void print(const SdkReleaseControlRes& value){
+        std::cout << "SdkReleaseControlRes\n";
+        std::cout << "  magic_header: " << value.magic_header << "\n";
+        std::cout << "  request_client_id: " << value.request_client_id << "\n";
+        std::cout << "  request_sequence_id: " << value.request_sequence_id << "\n";
+        std::cout << "  request_received_us: " << value.request_received_us << "\n";
+        std::cout << "  response_sent_us: " << value.response_sent_us << "\n";
+        std::cout << "  payload.status: " << enumToString(value.payload.status) << "\n";
+        std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
+    }
+
+    void print(const SdkRecoveryReq& value){
+        std::cout << "SdkRecoveryReq\n";
+        std::cout << "  magic_header: " << value.magic_header << "\n";
+        std::cout << "  client_id: " << value.client_id << "\n";
+        std::cout << "  session_id: " << value.session_id << "\n";
+        std::cout << "  sequence_id: " << value.sequence_id << "\n";
+        std::cout << "  timestamp_us: " << value.timestamp_us << "\n";
+        std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
+    }
+
+    void print(const SdkRecoveryRes& value){
+        std::cout << "SdkRecoveryRes\n";
+        std::cout << "  magic_header: " << value.magic_header << "\n";
+        std::cout << "  request_client_id: " << value.request_client_id << "\n";
+        std::cout << "  request_sequence_id: " << value.request_sequence_id << "\n";
+        std::cout << "  request_received_us: " << value.request_received_us << "\n";
+        std::cout << "  response_sent_us: " << value.response_sent_us << "\n";
         std::cout << "  payload.status: " << enumToString(value.payload.status) << "\n";
         std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
     }
@@ -449,15 +492,93 @@ namespace robot::platform {
         if (flags & DiagnosticFlags::kWaypointControlStrategyNotAllowed){
             printf("WaypointControlStrategyNotAllowed: Control strategy is not allowed for waypoint\n");
         }
+        if (flags & DiagnosticFlags::kWaypointSmoothingMethodNotAllowed){
+            printf("WaypointSmoothingMethodNotAllowed: Smoothing method is not allowed for waypoint\n");
+        }
         if (flags & DiagnosticFlags::kWaypointTargetTypeNotAllowed){
             printf("WaypointTargetTypeNotAllowed: Target type is not allowed for waypoint\n");
         }
         if (flags & DiagnosticFlags::kPlaybackControlRequirePositionTarget){
             printf("PlaybackControlRequirePositionTarget: Playback control require position target\n");
         }
+        if (flags & DiagnosticFlags::kPlaybackControlStartPoseNotReachable){
+            printf("PlaybackControlStartPoseNotReachable: Playback control start pose not reachable\n");
+        }
         if (flags & DiagnosticFlags::kUnknown){
             printf("FaultUnknown: Unknown fault\n");
         }
+    }
+    
+    std::pair<std::string, std::string> getStatusErrorMessage(CommandResponseStatus status){
+        std::string title;
+        std::string message;
+
+        switch (status) {
+            case CommandResponseStatus::kSuccess:
+                title = "Success";
+                message = "Command executed successfully.";
+                break;
+
+            case CommandResponseStatus::kRejectedBlocked:
+                title = "Access Denied";
+                message = "Another client with higher priority is currently controlling the robot.\n"
+                        "Please wait for the other client to release control, or try again.";
+                break;
+
+            case CommandResponseStatus::kRejectedConfigNotReady:
+                title = "System Busy";
+                message = "A configuration update is currently in progress.\n"
+                        "The requested configuration is not yet active. Please wait.";
+                break;
+
+            case CommandResponseStatus::kRejectedFaulted:
+                title = "System Fault";
+                message = "The robot is currently in a faulted state.\n"
+                        "A recovery operation is required to clear the fault.";
+                break;
+
+            case CommandResponseStatus::kRejectedSequenceId:
+                title = "Sequence Error";
+                message = "The command sequence ID is outdated.\n"
+                        "The system will resynchronize and retry automatically.";
+                break;
+
+            case CommandResponseStatus::kRejectedConfigRequired:
+                title = "Configuration Missing";
+                message = "Initial configuration is missing.\n"
+                        "You must set the robot configuration at least once.";
+                break;
+
+            case CommandResponseStatus::kInvalidCommand:
+                title = "Validation Failed";
+                message = "Packet payload failed structural or cryptographic validation.";
+                break;
+
+            case CommandResponseStatus::kInvalidClientId:
+            case CommandResponseStatus::kInvalidSessionId:
+                title = "Authentication Failed";
+                message = "Invalid Client ID or Session ID.\n"
+                        "The panel might have disconnected. Please re-authenticate.";
+                break;
+
+            case CommandResponseStatus::kInvalidConfig:
+                title = "Invalid Configuration";
+                message = "The sent configuration parameters are invalid.\n"
+                        "Please verify your settings and try again.";
+                break;
+
+            case CommandResponseStatus::kTimeout:
+                title = "Timeout Error";
+                message = "The configuration update timed out.\n"
+                        "Please check the network connection and try again.";
+                break;
+
+            default:
+                title = "Unknown Error";
+                message = "An unknown error occurred (Error Code: " + std::to_string(static_cast<int>(status)) + ").";
+                break;
+            }
+        return {title, message};
     }
 
     SdkConfigReq getReadOnlyConfigRequest(uint16_t client_id, uint32_t session_id, uint32_t sequence_id){

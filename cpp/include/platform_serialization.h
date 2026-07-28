@@ -23,6 +23,10 @@ namespace robot::platform::serialization {
     bool toBytes(const SdkSafeguardReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
     bool toBytes(const SdkHandshakeReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
     bool toBytes(const SdkHandshakeRes& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
+    bool toBytes(const SdkReleaseControlReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
+    bool toBytes(const SdkReleaseControlRes& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
+    bool toBytes(const SdkRecoveryReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
+    bool toBytes(const SdkRecoveryRes& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
     bool toBytes(const SrvState& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
     bool toBytes(const CoreRequestVariantPtr& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
     bool toBytes(const CoreResponseVariantPtr& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size);
@@ -36,6 +40,10 @@ namespace robot::platform::serialization {
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkSafeguardReq& value);
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkHandshakeReq& value);
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkHandshakeRes& value);
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkReleaseControlReq& value);
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkReleaseControlRes& value);
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkRecoveryReq& value);
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkRecoveryRes& value);
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SrvState& value);
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, CoreRequestVariantPtr& value);
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, CoreResponseVariantPtr& value);
