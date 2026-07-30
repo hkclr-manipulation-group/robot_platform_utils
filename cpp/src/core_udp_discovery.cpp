@@ -45,11 +45,16 @@ bool isLimitedBroadcast(const std::string& ip) {
 }
 
 bool isMulticastIp(const std::string& ip) {
-    const in_addr_t addr = inet_addr(ip.c_str());
-    if (addr == static_cast<in_addr_t>(-1)) {
+#if defined(_WIN32) || defined(_WIN64)
+    using addr_t = unsigned long;
+#else
+    using addr_t = in_addr_t;
+#endif
+    const addr_t addr = inet_addr(ip.c_str());
+    if (addr == static_cast<addr_t>(INADDR_NONE)) {
         return false;
     }
-    return IN_MULTICAST(ntohl(addr));
+    return IN_MULTICAST(ntohl(addr)) != 0;
 }
 
 bool setSendDestination(udp_node& node, const std::string& ip, int port) {
