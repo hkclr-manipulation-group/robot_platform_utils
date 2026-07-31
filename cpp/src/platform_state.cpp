@@ -456,9 +456,28 @@ namespace robot::platform {
         if (flags & DiagnosticFlags::kFaultGripperNotFound){
             printf("FaultGripperNotFound: Gripper not found\n");
         }
-        if (flags & DiagnosticFlags::kFaultHardwareInitFailed){
-            printf("FaultHardwareInitFailed: Hardware initialization failed\n");
+        if (flags & DiagnosticFlags::kFaultButtonNotFound){
+            printf("kFaultButtonNotFound: Button not found\n");
         }
+        if (flags & DiagnosticFlags::kFaultArmInitFailed){
+            printf("kFaultArmInitFailed: Arm Hardware initialization failed\n");
+        }
+        if (flags & DiagnosticFlags::kFaultGripperInitFailed){
+            printf("kFaultGripperInitFailed: Gripper Hardware initialization failed\n");
+        }
+        if (flags & DiagnosticFlags::kFaultButtonInitFailed){
+            printf("kFaultButtonInitFailed: Button Hardware initialization failed\n");
+        }
+        if (flags & DiagnosticFlags::kFaultHardwareEnableFailed){
+            printf("kFaultHardwareEnableFailed: Hardware failed to enable\n");
+        }
+        if (flags & DiagnosticFlags::kFaultHardwareChangeModeFailed){
+            printf("kFaultHardwareChangeModeFailed: Hardware failed to change mode\n");
+        }
+        if (flags & DiagnosticFlags::kFaultHardwareSetReadFailed){
+            printf("kFaultHardwareSetReadFailed: Hardware failed to Set or Read\n");
+        }
+
         if (flags & DiagnosticFlags::kFaultArmSizeMismatch){
             printf("FaultArmSizeMismatch: SDK arm count does not match server configuration\n");
         }
