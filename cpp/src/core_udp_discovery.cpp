@@ -1,11 +1,13 @@
 #include "core_udp_discovery.h"
 
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -197,6 +199,132 @@ DiscoveredServer discoverRtServerViaHandshake(
 
     throw std::runtime_error(
         "discoverRtServerViaHandshake: no SdkHandshakeRes from probes [" + tried.str() + "]");
+}
+
+std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
+    uint16_t client_id,
+    int core_request_port,
+    int local_ack_port,
+    const std::vector<std::string>& probe_ips,
+    float timeout_ms,
+    int max_attempts_per_probe) {
+    if (probe_ips.empty()) {
+        throw std::invalid_argument("discoverAllRtServersViaHandshake: probe_ips is empty");
+    }
+    if (core_request_port <= 0 || local_ack_port <= 0) {
+        throw std::invalid_argument("discoverAllRtServersViaHandshake: invalid ports");
+    }
+    if (max_attempts_per_probe < 1) {
+        max_attempts_per_probe = 1;
+    }
+
+    const std::size_t send_buffer_size =
+        sizeof(CoreRequestVariant) + HMAC_KEY_SIZE;
+    const std::size_t ack_buffer_size =
+        sizeof(CoreResponseVariant) + HMAC_KEY_SIZE;
+
+    udp_node node{};
+    const char local_ip[] = "0.0.0.0";
+    const int init_ret = udp_init_share_fd(
+        &node, local_ip, local_ack_port, probe_ips.front().c_str(), core_request_port,
+        static_cast<int>(ack_buffer_size), static_cast<int>(send_buffer_size));
+    if (init_ret != 0) {
+        throw std::runtime_error(
+            "discoverAllRtServersViaHandshake: udp_init_share_fd failed, code "
+            + std::to_string(init_ret));
+    }
+
+    struct UdpCloser {
+        udp_node* n;
+        ~UdpCloser() { if (n) udp_close(n); }
+    } closer{&node};
+
+    if (!enableBroadcast(node.send_fd)) {
+        std::cout << "discoverAllRtServersViaHandshake: warning: SO_BROADCAST failed\n";
+    }
+
+    std::unordered_map<std::string, DiscoveredServer> by_ip;
+    uint16_t sequence_id = 1;
+
+    for (const std::string& probe_ip : probe_ips) {
+        if (probe_ip.empty()) {
+            continue;
+        }
+        if (!setSendDestination(node, probe_ip, core_request_port)) {
+            continue;
+        }
+
+        for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
+            SdkHandshakeReq handshake{};
+            handshake.client_id = client_id;
+            handshake.sequence_id = sequence_id++;
+            handshake.timestamp_us = static_cast<uint64_t>(get_time_now());
+            CoreRequestVariantPtr request =
+                std::make_unique<CoreRequestVariant>(handshake);
+
+            std::size_t written_size = 0;
+            if (!serialization::packMessage(
+                    request, node.send_buffer, send_buffer_size, written_size, getClientHmacKey)) {
+                throw std::runtime_error("discoverAllRtServersViaHandshake: packMessage failed");
+            }
+            udp_send(&node, static_cast<int>(written_size));
+
+            const auto deadline =
+                std::chrono::steady_clock::now()
+                + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<float, std::milli>(timeout_ms));
+
+            while (std::chrono::steady_clock::now() < deadline) {
+                const auto remaining = deadline - std::chrono::steady_clock::now();
+                const auto remaining_us =
+                    std::chrono::duration_cast<std::chrono::microseconds>(remaining).count();
+                if (remaining_us <= 0) {
+                    break;
+                }
+                sockaddr_in peer{};
+                const int n = udp_select1(
+                    &node,
+                    static_cast<int>(remaining_us),
+                    static_cast<int>(ack_buffer_size),
+                    &peer);
+                if (n <= 0) {
+                    continue;
+                }
+
+                CoreResponseVariantPtr ack;
+                if (!serialization::unpackMessage(
+                        node.receive_buffer, static_cast<std::size_t>(n), ack, getClientHmacKey)
+                    || !ack
+                    || !std::holds_alternative<SdkHandshakeRes>(*ack)) {
+                    continue;
+                }
+                const auto& res = std::get<SdkHandshakeRes>(*ack);
+                if (res.request_client_id != client_id) {
+                    continue;
+                }
+                if (res.payload.status != CommandResponseStatus::kSuccess) {
+                    throw std::runtime_error(
+                        "discoverAllRtServersViaHandshake: server rejected handshake ("
+                        + enumToString(res.payload.status) + ")");
+                }
+
+                DiscoveredServer found;
+                found.server_ip = sockaddrToIp(peer);
+                found.session_id = res.assigned_session_id;
+                if (isMulticastIp(found.server_ip) || isLimitedBroadcast(found.server_ip)) {
+                    continue;
+                }
+                by_ip[found.server_ip] = found;
+            }
+        }
+    }
+
+    std::vector<DiscoveredServer> out;
+    out.reserve(by_ip.size());
+    for (auto& entry : by_ip) {
+        out.push_back(std::move(entry.second));
+    }
+    return out;
 }
 
 }  // namespace robot::platform

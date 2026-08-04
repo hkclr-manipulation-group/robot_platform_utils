@@ -50,6 +50,19 @@ inline DiscoveredServer discoverRtServerViaHandshake(
         std::vector<std::string>{probe_ip}, timeout_ms, max_attempts_per_probe);
 }
 
+/**
+ * Enumerate all RT servers that reply to SdkHandshakeReq.
+ * Collects unique peer IPs across probe targets within each wait window.
+ * Returns an empty vector when none respond (does not throw for "not found").
+ */
+std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
+    uint16_t client_id,
+    int core_request_port,
+    int local_ack_port,
+    const std::vector<std::string>& probe_ips,
+    float timeout_ms = 200.0f,
+    int max_attempts_per_probe = 2);
+
 }  // namespace robot::platform
 
 #endif
