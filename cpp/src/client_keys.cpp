@@ -35,6 +35,26 @@ ClientPriority parsePriority(const std::string& priority) {
     throw std::runtime_error("Unknown client priority: " + priority);
 }
 
+bool registerClientKey(
+    ClientKeyStore& store,
+    uint16_t client_id,
+    const char* name,
+    ClientPriority priority,
+    const char* hmac_key_hex) {
+    ClientConfig config;
+    config.client_name = name;
+    config.priority = priority;
+    config.hmac_key = hmac_key_hex;
+    if (config.hmac_key.empty()) {
+        return false;
+    }
+    if (client_id == 0) {
+        store.multicast_hmac_key = config.hmac_key;
+    }
+    store.registry.emplace(client_id, std::move(config));
+    return true;
+}
+
 } // namespace
 
 bool loadClientKeys(const std::string& json_path) {
@@ -85,6 +105,36 @@ bool loadClientKeys(const std::string& json_path) {
         std::cerr << "loadClientKeys failed for " << json_path << ": " << e.what() << std::endl;
         return false;
     }
+}
+
+bool loadClientKeys(const ClientKeyEntry* entries, std::size_t count) {
+    if (!entries || count == 0) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(keyStoreMutex());
+    ClientKeyStore next;
+    for (std::size_t i = 0; i < count; ++i) {
+        const ClientKeyEntry& entry = entries[i];
+        if (!entry.name || !entry.hmac_key_hex) {
+            return false;
+        }
+        if (!registerClientKey(
+                next,
+                entry.client_id,
+                entry.name,
+                entry.priority,
+                entry.hmac_key_hex)) {
+            return false;
+        }
+    }
+    if (next.multicast_hmac_key.empty()) {
+        std::cerr << "loadClientKeys: missing multicast key (client_id 0)" << std::endl;
+        return false;
+    }
+    next.loaded = true;
+    keyStore() = std::move(next);
+    return true;
 }
 
 bool isClientKeysLoaded() {

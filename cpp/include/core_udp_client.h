@@ -253,11 +253,11 @@ namespace robot::platform {
     template <typename UnpackT, typename PackT, typename AckT>
     void CoreUdpClient<UnpackT, PackT, AckT>::close(){
         is_running_ = false;
-        if (telemetry_udp_node_ptr_) udp_close(telemetry_udp_node_ptr_.get());
-        if (send_udp_node_ptr_) udp_close(send_udp_node_ptr_.get());
         if (ack_thread_.joinable()) {
             ack_thread_.join();
         }
+        if (telemetry_udp_node_ptr_) udp_close(telemetry_udp_node_ptr_.get());
+        if (send_udp_node_ptr_) udp_close(send_udp_node_ptr_.get());
     }
 
     

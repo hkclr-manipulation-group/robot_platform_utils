@@ -186,6 +186,7 @@ DiscoveredServer discoverRtServerViaHandshake(
             DiscoveredServer out;
             out.server_ip = sockaddrToIp(peer);
             out.session_id = res.assigned_session_id;
+            out.last_handshake_sequence_id = kHandshakeSeq;
             // Prefer a unicast peer address for later CoreUdpClient traffic.
             if (isMulticastIp(out.server_ip) || isLimitedBroadcast(out.server_ip)) {
                 std::cout << "discoverRtServerViaHandshake: warning: peer address "
@@ -311,10 +312,19 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
                 DiscoveredServer found;
                 found.server_ip = sockaddrToIp(peer);
                 found.session_id = res.assigned_session_id;
+                found.last_handshake_sequence_id = handshake.sequence_id;
                 if (isMulticastIp(found.server_ip) || isLimitedBroadcast(found.server_ip)) {
                     continue;
                 }
-                by_ip[found.server_ip] = found;
+                auto existing = by_ip.find(found.server_ip);
+                if (existing == by_ip.end()) {
+                    by_ip.emplace(found.server_ip, found);
+                } else {
+                    existing->second.session_id = found.session_id;
+                    existing->second.last_handshake_sequence_id = std::max(
+                        existing->second.last_handshake_sequence_id,
+                        found.last_handshake_sequence_id);
+                }
             }
         }
     }
