@@ -47,8 +47,36 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
     cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH PARENT_DIR)
     cmake_path(GET PARENT_DIR PARENT_PATH PARENT_PARENT_DIR)
     
-    find_package(OpenSSL REQUIRED)
-    find_package(ZLIB REQUIRED)
+    find_package(OpenSSL CONFIG QUIET)
+    if(NOT OpenSSL_FOUND)
+        find_package(OpenSSL REQUIRED)
+    endif()
+
+    set(_robot_platform_openssl_deps OpenSSL::Crypto)
+    if(WIN32)
+        # OpenSSL static builds reference Cert* APIs; ensure system libs reach the final link.
+        list(APPEND _robot_platform_openssl_deps ws2_32 crypt32 advapi32 gdi32 user32)
+    endif()
+
+    # Prefer ZLIBConfig.cmake (libzs.lib / ZLIB::ZLIBSTATIC); fall back to FindZLIB.
+    find_package(ZLIB CONFIG QUIET COMPONENTS static)
+    if(NOT ZLIB_FOUND)
+        find_package(ZLIB CONFIG QUIET COMPONENTS shared)
+    endif()
+    if(NOT ZLIB_FOUND)
+        find_package(ZLIB REQUIRED)
+    endif()
+    if(TARGET ZLIB::ZLIBSTATIC AND NOT TARGET ZLIB::ZLIB)
+        add_library(ZLIB::ZLIB ALIAS ZLIB::ZLIBSTATIC)
+    endif()
+    if(TARGET ZLIB::ZLIB)
+        get_target_property(_zlib_include_dirs ZLIB::ZLIB INTERFACE_INCLUDE_DIRECTORIES)
+        if(_zlib_include_dirs)
+            set(ZLIB_INCLUDE_DIRS "${_zlib_include_dirs}")
+        endif()
+        unset(_zlib_include_dirs)
+    endif()
+
     find_package(Eigen3 REQUIRED)
 
     find_package(yaml-cpp REQUIRED
@@ -76,12 +104,13 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
     add_library(robot::platform_utils ALIAS robot_platform_utils)
     target_link_libraries(robot_platform_utils PUBLIC 
         ${yaml_library}
-        OpenSSL::Crypto 
+        ${_robot_platform_openssl_deps}
         ZLIB::ZLIB
         curi::udp
         curi::tcp
         Eigen3::Eigen
     )
+    unset(_robot_platform_openssl_deps)
     
     target_include_directories(robot_platform_utils PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
