@@ -12,6 +12,9 @@ struct DiscoveredServer {
     std::string server_ip;
     uint32_t session_id = 0;
     uint32_t last_handshake_sequence_id = 0;
+    /** robot_timestamp_us = local_timestamp_us + time_offset_us (from handshake). */
+    int64_t time_offset_us = 0;
+    int64_t handshake_rtt_us = 0;
 };
 
 /**

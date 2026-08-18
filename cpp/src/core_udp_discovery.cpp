@@ -27,6 +27,7 @@ typedef unsigned long in_addr_t;
 #include "curi_udp/c/curi_udp.h"
 #include "platform_serialization.h"
 #include "platform_state.h"
+#include "time_sync.h"
 #include "time_utils.h"
 
 namespace robot::platform {
@@ -183,17 +184,29 @@ DiscoveredServer discoverRtServerViaHandshake(
                     + enumToString(res.payload.status) + ")");
             }
 
+            const int64_t client_recv_us = get_time_now();
+            const TimeSyncResult sync = computeTimeSyncFromHandshake(HandshakeTimestamps{
+                static_cast<int64_t>(handshake.timestamp_us),
+                static_cast<int64_t>(res.request_received_us),
+                static_cast<int64_t>(res.response_sent_us),
+                client_recv_us,
+            });
+
             DiscoveredServer out;
             out.server_ip = sockaddrToIp(peer);
             out.session_id = res.assigned_session_id;
             out.last_handshake_sequence_id = kHandshakeSeq;
+            out.time_offset_us = sync.offset_us;
+            out.handshake_rtt_us = sync.rtt_us;
             // Prefer a unicast peer address for later CoreUdpClient traffic.
             if (isMulticastIp(out.server_ip) || isLimitedBroadcast(out.server_ip)) {
                 std::cout << "discoverRtServerViaHandshake: warning: peer address "
                           << out.server_ip << " is not unicast\n";
             }
             std::cout << "discoverRtServerViaHandshake: found server " << out.server_ip
-                      << " via probe " << probe_ip << "\n";
+                      << " via probe " << probe_ip
+                      << " time_offset_us=" << out.time_offset_us
+                      << " rtt_us=" << out.handshake_rtt_us << "\n";
             return out;
         }
     }
@@ -309,10 +322,20 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
                         + enumToString(res.payload.status) + ")");
                 }
 
+                const int64_t client_recv_us = get_time_now();
+                const TimeSyncResult sync = computeTimeSyncFromHandshake(HandshakeTimestamps{
+                    static_cast<int64_t>(handshake.timestamp_us),
+                    static_cast<int64_t>(res.request_received_us),
+                    static_cast<int64_t>(res.response_sent_us),
+                    client_recv_us,
+                });
+
                 DiscoveredServer found;
                 found.server_ip = sockaddrToIp(peer);
                 found.session_id = res.assigned_session_id;
                 found.last_handshake_sequence_id = handshake.sequence_id;
+                found.time_offset_us = sync.offset_us;
+                found.handshake_rtt_us = sync.rtt_us;
                 if (isMulticastIp(found.server_ip) || isLimitedBroadcast(found.server_ip)) {
                     continue;
                 }
@@ -324,6 +347,8 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
                     existing->second.last_handshake_sequence_id = std::max(
                         existing->second.last_handshake_sequence_id,
                         found.last_handshake_sequence_id);
+                    existing->second.time_offset_us = found.time_offset_us;
+                    existing->second.handshake_rtt_us = found.handshake_rtt_us;
                 }
             }
         }
