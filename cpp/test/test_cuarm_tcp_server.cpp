@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <cstring>
@@ -24,15 +25,33 @@ struct TcpTestResponse {
     char message[128];
 };
 
-void pack_response(TcpTestResponse* response, char* send_buffer, int buffer_size)
+bool pack_response(
+    const TcpTestResponse& response,
+    std::uint8_t* send_buffer,
+    std::size_t buffer_size,
+    std::size_t& written_size)
 {
-    std::snprintf(send_buffer, buffer_size, "%s", response->message);
+    const int n = std::snprintf(
+        reinterpret_cast<char*>(send_buffer),
+        buffer_size,
+        "%s",
+        response.message);
+    if (n < 0 || static_cast<std::size_t>(n) >= buffer_size) {
+        return false;
+    }
+    written_size = static_cast<std::size_t>(n);
+    return true;
 }
 
-void unpack_command(TcpTestCommand* command, char* receive_buffer)
+bool unpack_command(
+    const std::uint8_t* receive_buffer,
+    std::size_t receive_size,
+    TcpTestCommand& command)
 {
-    std::strncpy(command->message, receive_buffer, 127);
-    command->message[127] = '\0'; 
+    const std::size_t copy_len = std::min(receive_size, sizeof(command.message) - 1);
+    std::memcpy(command.message, receive_buffer, copy_len);
+    command.message[copy_len] = '\0';
+    return true;
 }
 
 std::atomic<bool> stop_requested(false);
@@ -49,7 +68,7 @@ int main()
 #if !defined(_WIN32) && !defined(WIN32)
     std::signal(SIGINT, handle_sig);
 #endif
- 
+
     const std::string kServerIP = "127.0.0.1";
     constexpr int kServerPort = 30001;
     constexpr int kBufferSize = 1024;
@@ -75,13 +94,13 @@ int main()
                 std::cout << "Client connected. Waiting for commands..." << std::endl;
             } else {
                 TcpTestCommand command{};
-                int ret = server.receive(&command, kSelectTimeoutUsec);
+                const int ret = server.receive(command, kSelectTimeoutUsec);
                 if (ret == 0) {
                     std::cout << "Executing: " << command.message << std::endl;
 
                     TcpTestResponse response{};
                     std::strncpy(response.message, "COMMAND_DONE", 127);
-                    server.send(&response);
+                    server.send(response);
                 } else if (ret == -1) {
                     std::cout << "Client disconnected." << std::endl;
                 }
@@ -95,9 +114,8 @@ int main()
         return 1;
     }
 
-// Bypassing global exit teardown to prevent runtime library mismatch with Conda dependencies.
 #if defined(_DEBUG) || !defined(NDEBUG)
-    std::_Exit(0); 
+    std::_Exit(0);
 #else
     return 0;
 #endif

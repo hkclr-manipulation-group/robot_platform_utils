@@ -155,6 +155,7 @@ endif()
 ################################### Test Suite ###########################################
 if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_CPP_TESTS)
     message(STATUS "Configuring C++ Testing Executables...")
+    find_package(Threads REQUIRED)
     
     set(TEST_NAMES 
         test_config_loader 
@@ -164,11 +165,15 @@ if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_CPP_TESTS)
         test_cuarm_udp_client
         test_core_udp_client1
         test_core_udp_client2
+        test_tcp_data_roundtrip
     )
 
     foreach(test_target ${TEST_NAMES})
         add_executable(${test_target} "${CMAKE_CURRENT_LIST_DIR}/test/${test_target}.cpp")
-        target_link_libraries(${test_target} PRIVATE robot::platform_utils)
+        target_link_libraries(${test_target} PRIVATE robot::platform_utils Threads::Threads)
+        if(UNIX AND NOT APPLE)
+            target_link_options(${test_target} PRIVATE -pthread)
+        endif()
         target_compile_definitions(${test_target} PUBLIC PROJECT_ROOT_DIR=\"${PARENT_PARENT_DIR}\")
     endforeach()
 endif()

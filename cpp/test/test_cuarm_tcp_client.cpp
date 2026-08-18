@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -17,15 +18,33 @@ struct TcpTestResponse {
     char message[128];
 };
 
-void pack_command(TcpTestCommand* command, char* send_buffer, int buffer_size)
+bool pack_command(
+    const TcpTestCommand& command,
+    std::uint8_t* send_buffer,
+    std::size_t buffer_size,
+    std::size_t& written_size)
 {
-    std::snprintf(send_buffer, buffer_size, "%s", command->message);
+    const int n = std::snprintf(
+        reinterpret_cast<char*>(send_buffer),
+        buffer_size,
+        "%s",
+        command.message);
+    if (n < 0 || static_cast<std::size_t>(n) >= buffer_size) {
+        return false;
+    }
+    written_size = static_cast<std::size_t>(n);
+    return true;
 }
 
-void unpack_response(TcpTestResponse* response, char* receive_buffer)
+bool unpack_response(
+    const std::uint8_t* receive_buffer,
+    std::size_t receive_size,
+    TcpTestResponse& response)
 {
-    std::strncpy(response->message, receive_buffer, 127);
-    response->message[127] = '\0'; 
+    const std::size_t copy_len = std::min(receive_size, sizeof(response.message) - 1);
+    std::memcpy(response.message, receive_buffer, copy_len);
+    response.message[copy_len] = '\0';
+    return true;
 }
 
 }  // namespace
@@ -49,10 +68,10 @@ int main()
     TcpTestCommand command{};
     std::strncpy(command.message, "MOVE_J 0,0,0", 127);
     std::cout << "Sending command: " << command.message << std::endl;
-    client.send(&command);
+    client.send(command);
 
     TcpTestResponse response{};
-    int ret = client.receive(&response, kResponseTimeoutUsec);
+    const int ret = client.receive(response, kResponseTimeoutUsec);
     if (ret == 0) {
         std::cout << "Robot response: " << response.message << std::endl;
     } else if (ret == 1) {
@@ -63,9 +82,8 @@ int main()
     client.close();
     std::cout << "Connection closed." << std::endl;
 
-// Bypassing global exit teardown to prevent runtime library mismatch with Conda dependencies.
 #if defined(_DEBUG) || !defined(NDEBUG)
-    std::_Exit(0); 
+    std::_Exit(0);
 #else
     return 0;
 #endif
