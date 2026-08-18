@@ -16,7 +16,7 @@ extern "C" {
 namespace robot::platform {
 
 /**
- * Minimal cold-path TCP server for bulk data ingestion (teach files, logs, …).
+ * TCP data channel server (v2): Ping, blob upload, RPC, blob download.
  * Pair with TcpDataClient on the SDK side. Not used for real-time motion.
  */
 class TcpDataServer {
@@ -26,7 +26,24 @@ public:
         std::vector<std::uint8_t> data;
     };
 
-    using BlobHandler = std::function<bool(const BlobReceipt& receipt, std::string& error_message)>;
+    struct RpcResult {
+        bool ok = false;
+        std::uint32_t status_code = 0;
+        std::vector<std::uint8_t> response_body;
+        std::string error;
+
+        /** When non-empty, server streams BlobDownload* after RpcResponse. */
+        std::string download_name;
+        std::vector<std::uint8_t> download_data;
+    };
+
+    class DataChannelHandler {
+    public:
+        virtual ~DataChannelHandler() = default;
+        virtual bool onBlobComplete(const BlobReceipt& receipt, std::string& error_message) = 0;
+        virtual RpcResult onRpcRequest(std::uint32_t service_id, std::uint32_t method_id,
+                                       const std::uint8_t* request_body, std::size_t request_size) = 0;
+    };
 
     static constexpr int kDefaultPort = 8890;
 
@@ -39,14 +56,20 @@ public:
     bool listen(const std::string& bind_ip, int port = kDefaultPort, int buffer_size = 65536);
 
     /** Block until @p stop_requested becomes true. Handles one client at a time. */
-    void serveForever(const BlobHandler& handler, const std::function<bool()>& stop_requested);
+    void serveForever(DataChannelHandler& handler, const std::function<bool()>& stop_requested);
 
     void close();
 
 private:
+    bool sendFrame(tcp_data::MessageKind kind, std::uint32_t sequence, const std::uint8_t* payload,
+                   std::uint32_t payload_size);
     bool sendAck(std::uint32_t sequence, std::uint32_t status_code, int timeout_usec);
     bool sendError(std::uint32_t sequence, const std::string& message, int timeout_usec);
-    bool handleClient(const BlobHandler& handler, int timeout_usec);
+    bool sendRpcResponse(std::uint32_t sequence, std::uint32_t status_code,
+                         const std::vector<std::uint8_t>& body);
+    bool sendDownloadStream(std::uint32_t sequence, const std::string& name,
+                              const std::vector<std::uint8_t>& data, int timeout_usec);
+    bool handleClient(DataChannelHandler& handler, int timeout_usec);
 
     tcp_node* node_ = nullptr;
     int buffer_size_ = 65536;

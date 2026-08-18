@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "tcp_data_protocol.h"
+#include "tcp_data_services.h"
 
 extern "C" {
 #include "curi_tcp/c/src/curi_tcp.h"
@@ -15,12 +16,8 @@ extern "C" {
 namespace robot::platform {
 
 /**
- * Cold-path TCP client for bulk / non-real-time data (teach files, logs, etc.).
- *
- * Transport: curi_tcp length-prefixed frames (see curi_tcp_framed.h).
- * Application: tcp_data::MessageHeader + payload (see tcp_data_protocol.h).
- *
- * Real-time motion remains on UDP; this class is intentionally separate from CoreUdpClient.
+ * TCP data channel client (v2): Ping, blob upload/download, RPC services.
+ * Real-time motion remains on UDP.
  */
 class TcpDataClient {
 public:
@@ -28,6 +25,7 @@ public:
         bool ok = false;
         std::string message;
         std::uint32_t status_code = 0;
+        std::vector<std::uint8_t> response_body;
     };
 
     static constexpr int kDefaultPort = 8890;
@@ -39,46 +37,51 @@ public:
     TcpDataClient(const TcpDataClient&) = delete;
     TcpDataClient& operator=(const TcpDataClient&) = delete;
 
-    /** Connect as TCP client. */
     bool connect(const std::string& host, int port = kDefaultPort, int buffer_size = 65536);
-
     bool isConnected() const;
 
-    /** Round-trip latency check. */
     Result ping(int timeout_usec = kDefaultTimeoutUsec);
 
-    /**
-     * Upload a binary blob in chunked frames (BlobBegin → BlobChunk* → BlobEnd).
-     * Suitable for teach programs, calibration files, logs, etc.
-     */
-    Result uploadBlob(
-        const std::string& name,
-        const std::uint8_t* data,
-        std::size_t size,
-        std::uint32_t chunk_size = tcp_data::kDefaultChunkSize,
-        int timeout_usec = kDefaultTimeoutUsec);
+    Result uploadBlob(const std::string& name, const std::uint8_t* data, std::size_t size,
+                      std::uint32_t chunk_size = tcp_data::kDefaultChunkSize,
+                      int timeout_usec = kDefaultTimeoutUsec);
 
-    Result uploadBlob(
-        const std::string& name,
-        const std::vector<std::uint8_t>& data,
-        std::uint32_t chunk_size = tcp_data::kDefaultChunkSize,
-        int timeout_usec = kDefaultTimeoutUsec);
+    Result uploadBlob(const std::string& name, const std::vector<std::uint8_t>& data,
+                      std::uint32_t chunk_size = tcp_data::kDefaultChunkSize,
+                      int timeout_usec = kDefaultTimeoutUsec);
+
+    Result callRpc(tcp_data::ServiceId service, std::uint32_t method, const std::vector<std::uint8_t>& request_body,
+                   int timeout_usec = kDefaultTimeoutUsec);
+
+    Result listFiles(const std::string& prefix, std::vector<tcp_data::FileEntry>& entries,
+                     int timeout_usec = kDefaultTimeoutUsec);
+
+    Result deleteFile(const std::string& name, int timeout_usec = kDefaultTimeoutUsec);
+
+    Result statFile(const std::string& name, tcp_data::StatResult& stat, int timeout_usec = kDefaultTimeoutUsec);
+
+    Result downloadBlob(const std::string& name, std::vector<std::uint8_t>& data,
+                        int timeout_usec = kDefaultTimeoutUsec);
+
+    Result getCapabilities(std::vector<std::uint8_t>& capabilities_body, int timeout_usec = kDefaultTimeoutUsec);
 
     void close();
 
 private:
-    Result sendMessage(
-        tcp_data::MessageKind kind,
-        std::uint32_t sequence,
-        const std::uint8_t* payload,
-        std::uint32_t payload_size);
+    Result sendMessage(tcp_data::MessageKind kind, std::uint32_t sequence, const std::uint8_t* payload,
+                       std::uint32_t payload_size);
 
     Result expectAck(std::uint32_t sequence, int timeout_usec);
+    Result expectRpcResponse(std::uint32_t sequence, int timeout_usec);
+    Result receiveFrame(int timeout_usec);
+    Result receiveDownloadStream(std::uint32_t sequence, const std::string& expected_name,
+                                 std::vector<std::uint8_t>& data, int timeout_usec);
 
     tcp_node* node_ = nullptr;
     int buffer_size_ = 65536;
     std::vector<std::uint8_t> tx_buffer_;
     std::vector<std::uint8_t> rx_buffer_;
+    int last_frame_len_ = 0;
     std::uint32_t next_sequence_ = 1;
     bool connected_ = false;
 };

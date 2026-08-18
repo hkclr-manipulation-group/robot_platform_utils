@@ -166,6 +166,7 @@ if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_CPP_TESTS)
         test_core_udp_client1
         test_core_udp_client2
         test_tcp_data_roundtrip
+        test_tcp_data_rpc
     )
 
     foreach(test_target ${TEST_NAMES})
