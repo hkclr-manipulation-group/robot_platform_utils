@@ -30,6 +30,8 @@ public:
 
     static constexpr int kDefaultPort = 8890;
     static constexpr int kDefaultTimeoutUsec = 5'000'000;
+    /** Fast-fail connect budget when probing optional TcpDataServer (legacy rt_control). */
+    static constexpr int kDefaultConnectTimeoutUsec = 500'000;
 
     TcpDataClient();
     ~TcpDataClient();
@@ -37,7 +39,8 @@ public:
     TcpDataClient(const TcpDataClient&) = delete;
     TcpDataClient& operator=(const TcpDataClient&) = delete;
 
-    bool connect(const std::string& host, int port = kDefaultPort, int buffer_size = 65536);
+    bool connect(const std::string& host, int port = kDefaultPort, int buffer_size = 65536,
+                 int connect_timeout_usec = kDefaultConnectTimeoutUsec);
     bool isConnected() const;
 
     Result ping(int timeout_usec = kDefaultTimeoutUsec);

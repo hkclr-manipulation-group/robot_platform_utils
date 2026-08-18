@@ -54,7 +54,7 @@ TcpDataClient::~TcpDataClient() {
     close();
 }
 
-bool TcpDataClient::connect(const std::string& host, int port, int buffer_size) {
+bool TcpDataClient::connect(const std::string& host, int port, int buffer_size, int connect_timeout_usec) {
     close();
 
     buffer_size_ = buffer_size;
@@ -67,7 +67,7 @@ bool TcpDataClient::connect(const std::string& host, int port, int buffer_size) 
     }
     std::memset(node_, 0, sizeof(tcp_node));
 
-    if (tcp_init(node_, host.c_str(), port, buffer_size_, false) != 0) {
+    if (tcp_init_ex(node_, host.c_str(), port, buffer_size_, false, connect_timeout_usec) != 0) {
         close();
         return false;
     }
