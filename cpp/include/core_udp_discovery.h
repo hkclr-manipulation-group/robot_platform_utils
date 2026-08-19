@@ -9,6 +9,7 @@ namespace robot::platform {
 
 /** Result of probing the network with SdkHandshakeReq. */
 struct DiscoveredServer {
+    std::string robot_name;
     std::string server_ip;
     uint32_t session_id = 0;
     uint32_t last_handshake_sequence_id = 0;

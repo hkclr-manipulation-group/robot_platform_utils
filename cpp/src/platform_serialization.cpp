@@ -519,7 +519,8 @@ namespace robot::platform::serialization {
             writeRaw(value.assigned_session_id, cursor, remaining);
 
             writeEnum(value.payload.status, cursor, remaining);
-            write_phase.push_back(std::make_pair("after assigned_session_id", cursor - buffer));
+            writeRaw(value.payload.robot_name, MAX_NAME_SIZE, cursor, remaining);
+            write_phase.push_back(std::make_pair("after robot_name", cursor - buffer));
 
         }catch (const std::exception& e) {
             catchToBytesError("catchToBytesError:toBytes(SdkHandshakeRes)", e, value, buffer_size, written_size, write_phase);
@@ -943,6 +944,10 @@ namespace robot::platform::serialization {
         readRaw(cursor, value.assigned_session_id);
 
         readEnum(cursor, value.payload.status);
+        std::memset(value.payload.robot_name, 0, MAX_NAME_SIZE);
+        if (static_cast<std::size_t>(buffer + buffer_size - cursor) >= MAX_NAME_SIZE) {
+            readRaw(cursor, value.payload.robot_name, MAX_NAME_SIZE);
+        }
         return verifyReadBuffer("fromBytes(SdkHandshakeRes)", cursor, buffer, buffer_size, write_phase);
     }
 

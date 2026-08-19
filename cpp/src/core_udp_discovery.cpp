@@ -1,5 +1,6 @@
 #include "core_udp_discovery.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <iostream>
@@ -48,6 +49,37 @@ struct DiscoveryTarget {
     /** When non-empty, set IP_MULTICAST_IF before send (Windows multi-NIC). */
     std::string multicast_if_ip;
 };
+
+std::atomic<uint32_t> g_next_discovery_handshake_seq{1};
+
+uint32_t nextDiscoveryHandshakeSequenceId() {
+    return g_next_discovery_handshake_seq.fetch_add(1, std::memory_order_relaxed);
+}
+
+bool isStaleDiscoveryHandshakeResponse(
+    const SdkHandshakeRes& res,
+    uint16_t client_id,
+    uint32_t sequence_id) {
+    return res.request_client_id != client_id
+        || res.request_sequence_id != sequence_id;
+}
+
+std::string wireRobotNameToString(const char (&name)[MAX_NAME_SIZE]) {
+    return std::string(name, ::strnlen(name, MAX_NAME_SIZE));
+}
+
+void fillDiscoveredServerFromHandshake(
+    DiscoveredServer& out,
+    const SdkHandshakeRes& res,
+    uint32_t handshake_sequence_id,
+    int64_t time_offset_us,
+    int64_t handshake_rtt_us) {
+    out.session_id = res.assigned_session_id;
+    out.last_handshake_sequence_id = handshake_sequence_id;
+    out.time_offset_us = time_offset_us;
+    out.handshake_rtt_us = handshake_rtt_us;
+    out.robot_name = wireRobotNameToString(res.payload.robot_name);
+}
 
 bool enableBroadcast(curi_socket_t fd) {
 #if defined(_WIN32) || defined(_WIN64)
@@ -420,10 +452,10 @@ DiscoveredServer discoverRtServerViaHandshake(
 
     configureDiscoverySocket(node.send_fd);
 
-    constexpr uint16_t kHandshakeSeq = 1;
     SdkHandshakeReq handshake{};
     handshake.client_id = client_id;
-    handshake.sequence_id = kHandshakeSeq;
+    uint32_t sequence_id = nextDiscoveryHandshakeSequenceId();
+    int sequence_resync_remaining = 16;
 
     std::ostringstream tried;
     for (size_t ti = 0; ti < targets.size(); ++ti) {
@@ -437,6 +469,7 @@ DiscoveredServer discoverRtServerViaHandshake(
     }
 
     for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
+        handshake.sequence_id = sequence_id;
         sendDiscoveryHandshakeBurst(
             node, targets, core_request_port, handshake, send_buffer_size);
 
@@ -460,7 +493,17 @@ DiscoveredServer discoverRtServerViaHandshake(
         }
 
         const auto& res = std::get<SdkHandshakeRes>(*ack);
-        if (res.request_client_id != client_id) {
+        if (isStaleDiscoveryHandshakeResponse(res, client_id, handshake.sequence_id)) {
+            continue;
+        }
+        if (res.payload.status == CommandResponseStatus::kRejectedSequenceId) {
+            if (sequence_resync_remaining-- <= 0) {
+                throw std::runtime_error(
+                    "discoverRtServerViaHandshake: server rejected handshake ("
+                    + enumToString(res.payload.status) + ")");
+            }
+            sequence_id = nextDiscoveryHandshakeSequenceId();
+            --attempt;
             continue;
         }
         if (res.payload.status != CommandResponseStatus::kSuccess) {
@@ -479,15 +522,14 @@ DiscoveredServer discoverRtServerViaHandshake(
 
         DiscoveredServer out;
         out.server_ip = sockaddrToIp(peer);
-        out.session_id = res.assigned_session_id;
-        out.last_handshake_sequence_id = kHandshakeSeq;
-        out.time_offset_us = sanitizeTimeSyncOffset(sync.offset_us);
-        out.handshake_rtt_us = sync.rtt_us;
+        fillDiscoveredServerFromHandshake(
+            out, res, handshake.sequence_id, sanitizeTimeSyncOffset(sync.offset_us), sync.rtt_us);
         if (isMulticastIp(out.server_ip) || isLimitedBroadcast(out.server_ip)) {
             std::cout << "discoverRtServerViaHandshake: warning: peer address "
                       << out.server_ip << " is not unicast\n";
         }
         std::cout << "discoverRtServerViaHandshake: found server " << out.server_ip
+                  << " robot_name=" << out.robot_name
                   << " time_offset_us=" << out.time_offset_us
                   << " rtt_us=" << out.handshake_rtt_us << "\n";
         return out;
@@ -543,15 +585,17 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     configureDiscoverySocket(node.send_fd);
 
     std::unordered_map<std::string, DiscoveredServer> by_ip;
-    uint16_t sequence_id = 1;
+    uint32_t sequence_id = nextDiscoveryHandshakeSequenceId();
+    int sequence_resync_remaining = 16;
 
     for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
         SdkHandshakeReq handshake{};
         handshake.client_id = client_id;
-        handshake.sequence_id = sequence_id++;
+        handshake.sequence_id = sequence_id;
         sendDiscoveryHandshakeBurst(
             node, targets, core_request_port, handshake, send_buffer_size);
 
+        bool saw_sequence_rejection = false;
         const auto deadline =
             std::chrono::steady_clock::now()
             + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -582,7 +626,11 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
                 continue;
             }
             const auto& res = std::get<SdkHandshakeRes>(*ack);
-            if (res.request_client_id != client_id) {
+            if (isStaleDiscoveryHandshakeResponse(res, client_id, handshake.sequence_id)) {
+                continue;
+            }
+            if (res.payload.status == CommandResponseStatus::kRejectedSequenceId) {
+                saw_sequence_rejection = true;
                 continue;
             }
             if (res.payload.status != CommandResponseStatus::kSuccess) {
@@ -601,10 +649,12 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
 
             DiscoveredServer found;
             found.server_ip = sockaddrToIp(peer);
-            found.session_id = res.assigned_session_id;
-            found.last_handshake_sequence_id = handshake.sequence_id;
-                found.time_offset_us = sanitizeTimeSyncOffset(sync.offset_us);
-            found.handshake_rtt_us = sync.rtt_us;
+            fillDiscoveredServerFromHandshake(
+                found,
+                res,
+                handshake.sequence_id,
+                sanitizeTimeSyncOffset(sync.offset_us),
+                sync.rtt_us);
             if (isMulticastIp(found.server_ip) || isLimitedBroadcast(found.server_ip)) {
                 continue;
             }
@@ -618,7 +668,20 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
                     found.last_handshake_sequence_id);
                 existing->second.time_offset_us = found.time_offset_us;
                 existing->second.handshake_rtt_us = found.handshake_rtt_us;
+                if (!found.robot_name.empty()) {
+                    existing->second.robot_name = found.robot_name;
+                }
             }
+        }
+
+        if (!by_ip.empty()) {
+            break;
+        }
+        if (saw_sequence_rejection && sequence_resync_remaining-- > 0) {
+            sequence_id = nextDiscoveryHandshakeSequenceId();
+            --attempt;
+        } else {
+            sequence_id = nextDiscoveryHandshakeSequenceId();
         }
     }
 

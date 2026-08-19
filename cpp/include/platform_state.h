@@ -441,6 +441,8 @@ namespace robot::platform {
         // --- Payload Block ---
         struct {
             CommandResponseStatus status;
+            /** Trailing handshake extension (optional on wire for old peers). */
+            char robot_name[MAX_NAME_SIZE]{};
         }payload;
         
         uint8_t  security_hmac[HMAC_KEY_SIZE];

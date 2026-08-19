@@ -262,6 +262,8 @@ namespace robot::platform {
         std::cout << "  response_sent_us: " << value.response_sent_us << "\n";
         std::cout << "  assigned_session_id: " << value.assigned_session_id << "\n";
         std::cout << "  payload.status: " << enumToString(value.payload.status) << "\n";
+        std::cout << "  payload.robot_name: "
+                  << toSafeString(value.payload.robot_name, MAX_NAME_SIZE) << "\n";
         std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
     }
 
