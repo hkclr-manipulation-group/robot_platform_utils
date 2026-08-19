@@ -29,6 +29,16 @@ inline int64_t localTimestampToRobotUs(int64_t offset_us, int64_t local_timestam
     return local_timestamp_us + offset_us;
 }
 
+/** True when offset looks like a valid clock skew (not an epoch-sized bogus value). */
+inline bool isPlausibleTimeSyncOffset(int64_t offset_us) {
+    constexpr int64_t kMaxAbsOffsetUs = 86'400'000'000LL;  // 1 day
+    return offset_us >= -kMaxAbsOffsetUs && offset_us <= kMaxAbsOffsetUs;
+}
+
+inline int64_t sanitizeTimeSyncOffset(int64_t offset_us) {
+    return isPlausibleTimeSyncOffset(offset_us) ? offset_us : 0;
+}
+
 }  // namespace robot::platform
 
 #endif

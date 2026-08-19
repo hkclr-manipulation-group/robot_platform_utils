@@ -30,11 +30,13 @@ if(WIN32)
         include_directories($ENV{INCLUDE_PATH})
         link_directories($ENV{LIBRARY_PATH})
         add_definitions(-DNOMINMAX)
-        # add_definitions(-DYAML_CPP_STATIC_DEFINE)
-        # set(yaml_library "$<$<CONFIG:Debug>:yaml-cppd.lib>$<$<NOT:$<CONFIG:Debug>>:yaml-cpp.lib>")
         add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
         add_compile_definitions(WIN32_LEAN_AND_MEAN)
     endif()
+endif()
+set(_robot_platform_win32_system_libs "")
+if(WIN32)
+    list(APPEND _robot_platform_win32_system_libs iphlpapi)
 endif()
 ################################### Build Switches ###########################################
 option(BUILD_LIB "Build Core Library" ON)
@@ -109,7 +111,9 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
         curi::udp
         curi::tcp
         Eigen3::Eigen
+        ${_robot_platform_win32_system_libs}
     )
+    unset(_robot_platform_win32_system_libs)
     unset(_robot_platform_openssl_deps)
     
     target_include_directories(robot_platform_utils PUBLIC 
