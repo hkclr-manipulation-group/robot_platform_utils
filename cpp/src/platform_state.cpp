@@ -249,6 +249,7 @@ namespace robot::platform {
         std::cout << "  magic_header: " << value.magic_header << "\n";
         std::cout << "  client_id: " << value.client_id << "\n";
         std::cout << "  sequence_id: " << value.sequence_id << "\n";
+        std::cout << "  telemetry_port: " << value.telemetry_port << "\n";
         std::cout << "  timestamp_us: " << value.timestamp_us << "\n";
         std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
     }
@@ -381,15 +382,23 @@ namespace robot::platform {
             printf("None\n");
             return;
         }
-        
         if (flags & DiagnosticFlags::kTargetPosSaturation){
-            printf("TargetPosSaturation: User target clamped by soft position limits\n");
+            printf("TargetPosSaturation: position target is saturated\n");
         }
         if (flags & DiagnosticFlags::kTargetVelSaturation){
-            printf("TargetVelSaturation: User target clamped by soft velocity limits\n");
+            printf("TargetVelSaturation: velocity target is saturated\n");
         }
         if (flags & DiagnosticFlags::kTargetTorSaturation){
-            printf("TargetTorSaturation: User target clamped by soft torque limits\n");
+            printf("TargetTorSaturation: torque target is saturated\n");
+        }
+        if (flags & DiagnosticFlags::kTargetPosOutOfRange){
+            printf("TargetPosOutOfRange: User position target out of range\n");
+        }
+        if (flags & DiagnosticFlags::kTargetVelOutOfRange){
+            printf("TargetVelOutOfRange: User velocity target out of range\n");
+        }
+        if (flags & DiagnosticFlags::kTargetTorOutOfRange){
+            printf("TargetTorOutOfRange: User torque target out of range\n");
         }
         if (flags & DiagnosticFlags::kActuatorPosSaturation){
             printf("ActuatorPosSaturation: Actuator command clamped by soft position limits\n");
@@ -542,7 +551,7 @@ namespace robot::platform {
 
             case CommandResponseStatus::kRejectedBlocked:
                 title = "Access Denied";
-                message = "Another client with higher priority is currently controlling the robot.\n"
+                message = "Another client with higher priority or same priority is currently controlling the robot.\n"
                         "Please wait for the other client to release control, or try again.";
                 break;
 

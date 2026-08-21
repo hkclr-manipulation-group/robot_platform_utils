@@ -99,65 +99,69 @@ namespace robot::platform {
         constexpr uint64_t kNone                         = 0; // No warning
         
         // --- Target Profile Saturation (Pre-Interpolation) ---
-        constexpr uint64_t kTargetPosSaturation          = 1ULL << 0; // User target clamped by soft position limits
-        constexpr uint64_t kTargetVelSaturation          = 1ULL << 1; // User target clamped by soft velocity limits
-        constexpr uint64_t kTargetTorSaturation          = 1ULL << 2; // User target clamped by soft torque limits
+        constexpr uint64_t kTargetPosOutOfRange          = 1ULL << 1; // User target exceeds soft position limits, stop moving
+        constexpr uint64_t kTargetVelOutOfRange          = 1ULL << 2; // User target exceeds soft velocity limits, stop moving
+        constexpr uint64_t kTargetTorOutOfRange          = 1ULL << 3; // User target exceeds soft torque limits, stop moving
+        constexpr uint64_t kTargetPosSaturation          = 1ULL << 4; // target clamped by soft position limits
+        constexpr uint64_t kTargetVelSaturation          = 1ULL << 5; // target clamped by soft velocity limits
+        constexpr uint64_t kTargetTorSaturation          = 1ULL << 6; // target clamped by soft torque limits
         
         // --- Real-Time Command Saturation (Post-PID Loop) ---
-        constexpr uint64_t kActuatorPosSaturation        = 1ULL << 3; // Actuator command clamped by soft position limits
-        constexpr uint64_t kActuatorVelSaturation        = 1ULL << 4; // Actuator command clamped by soft velocity limits
-        constexpr uint64_t kActuatorTorSaturation        = 1ULL << 5; // Actuator command clamped by soft torque limits
-        constexpr uint64_t kActuatorPosJumpSaturation    = 1ULL << 6; // Actuator command clamped by position jump limit
-        constexpr uint64_t kActuatorVelJumpSaturation    = 1ULL << 7; // Actuator command clamped by velocity jump limit
-        constexpr uint64_t kActuatorTorJumpSaturation    = 1ULL << 8; // Actuator command clamped by torque jump limit
+        constexpr uint64_t kActuatorPosSaturation        = 1ULL << 7; // Actuator command clamped by soft position limits
+        constexpr uint64_t kActuatorVelSaturation        = 1ULL << 8; // Actuator command clamped by soft velocity limits
+        constexpr uint64_t kActuatorTorSaturation        = 1ULL << 9; // Actuator command clamped by soft torque limits
+        constexpr uint64_t kActuatorPosJumpSaturation    = 1ULL << 10; // Actuator command clamped by position jump limit
+        constexpr uint64_t kActuatorVelJumpSaturation    = 1ULL << 11; // Actuator command clamped by velocity jump limit
+        constexpr uint64_t kActuatorTorJumpSaturation    = 1ULL << 12; // Actuator command clamped by torque jump limit
         
         // --- Soft Workspace Boundary Safety Interceptions ---
-        constexpr uint64_t kBoundaryVelClamp             = 1ULL << 9;  // Velocity zeroed in limit direction due to position boundary reached
-        constexpr uint64_t kBoundaryJointImpedance       = 1ULL << 10; // Joint impedance applied due to position boundary reached
+        constexpr uint64_t kBoundaryVelClamp             = 1ULL << 13;  // Velocity zeroed in limit direction due to position boundary reached
+        constexpr uint64_t kBoundaryJointImpedance       = 1ULL << 14; // Joint impedance applied due to position boundary reached
         
         // --- Algorithmic & Kinematic Planner Modifications ---
-        constexpr uint64_t kPlanTimelineExtended         = 1ULL << 11; // Trajectory segment duration (dt) stretched for velocity limits
-        constexpr uint64_t kPlanVelLimitInvalid          = 1ULL << 12; // Specified max velocity profile is smaller than the minimum allowed velocity
-        constexpr uint64_t kPlanDeltaTooLarge            = 1ULL << 13; // Distance between points is too large for a dynamic timeline
-        constexpr uint64_t kPlanVelocitySnap             = 1ULL << 14; // Large velocity shift over zero distance
-        constexpr uint64_t kPlanPointSkipped             = 1ULL << 15; // Duplicated points skipped
+        constexpr uint64_t kPlanTimelineExtended         = 1ULL << 15; // Trajectory segment duration (dt) stretched for velocity limits
+        constexpr uint64_t kPlanVelLimitInvalid          = 1ULL << 16; // Specified max velocity profile is smaller than the minimum allowed velocity
+        constexpr uint64_t kPlanDeltaTooLarge            = 1ULL << 17; // Distance between points is too large for a dynamic timeline
+        constexpr uint64_t kPlanVelocitySnap             = 1ULL << 18; // Large velocity shift over zero distance
+        constexpr uint64_t kPlanPointSkipped             = 1ULL << 19; // Duplicated points skipped
+        constexpr uint64_t kPlanInvalidSetting           = 1ULL << 20; // Invalid setting on Interpolator
 
         // --- Fault Flags ---
-        constexpr uint64_t kFaultPosHardLimitReached     = 1ULL << 16;
-        constexpr uint64_t kFaultVelHardLimitReached     = 1ULL << 17;
-        constexpr uint64_t kFaultTorHardLimitReached     = 1ULL << 18;
-        constexpr uint64_t kFaultPosTrackingFailed       = 1ULL << 19;
-        constexpr uint64_t kFaultVelTrackingFailed       = 1ULL << 20;
-        constexpr uint64_t kFaultTorTrackingFailed       = 1ULL << 21;
+        constexpr uint64_t kFaultPosHardLimitReached     = 1ULL << 20;
+        constexpr uint64_t kFaultVelHardLimitReached     = 1ULL << 21;
+        constexpr uint64_t kFaultTorHardLimitReached     = 1ULL << 22;
+        constexpr uint64_t kFaultPosTrackingFailed       = 1ULL << 23;
+        constexpr uint64_t kFaultVelTrackingFailed       = 1ULL << 24;
+        constexpr uint64_t kFaultTorTrackingFailed       = 1ULL << 25;
         
-        constexpr uint64_t kFaultArmNotFound                = 1ULL << 22;
-        constexpr uint64_t kFaultGripperNotFound            = 1ULL << 23;
-        constexpr uint64_t kFaultButtonNotFound             = 1ULL << 24;
-        constexpr uint64_t kFaultArmInitFailed              = 1ULL << 25;
-        constexpr uint64_t kFaultGripperInitFailed          = 1ULL << 26;
-        constexpr uint64_t kFaultButtonInitFailed           = 1ULL << 27;
-        constexpr uint64_t kFaultHardwareEnableFailed       = 1ULL << 28;
-        constexpr uint64_t kFaultHardwareChangeModeFailed   = 1ULL << 29;
-        constexpr uint64_t kFaultHardwareSetReadFailed      = 1ULL << 30;
+        constexpr uint64_t kFaultArmNotFound                = 1ULL << 26;
+        constexpr uint64_t kFaultGripperNotFound            = 1ULL << 27;
+        constexpr uint64_t kFaultButtonNotFound             = 1ULL << 28;
+        constexpr uint64_t kFaultArmInitFailed              = 1ULL << 29;
+        constexpr uint64_t kFaultGripperInitFailed          = 1ULL << 30;
+        constexpr uint64_t kFaultButtonInitFailed           = 1ULL << 31;
+        constexpr uint64_t kFaultHardwareEnableFailed       = 1ULL << 32;
+        constexpr uint64_t kFaultHardwareChangeModeFailed   = 1ULL << 33;
+        constexpr uint64_t kFaultHardwareSetReadFailed      = 1ULL << 34;
 
-        constexpr uint64_t kFaultArmSizeMismatch            = 1ULL << 31;
-        constexpr uint64_t kFaultGripperSizeMismatch        = 1ULL << 32;
-        constexpr uint64_t kFaultArmJointSizeMismatch       = 1ULL << 33;
-        constexpr uint64_t kFaultGripperJointSizeMismatch   = 1ULL << 34;
-        constexpr uint64_t kFaultRobotNameMismatch          = 1ULL << 35;
+        constexpr uint64_t kFaultArmSizeMismatch            = 1ULL << 35;
+        constexpr uint64_t kFaultGripperSizeMismatch        = 1ULL << 36;
+        constexpr uint64_t kFaultArmJointSizeMismatch       = 1ULL << 37;
+        constexpr uint64_t kFaultGripperJointSizeMismatch   = 1ULL << 38;
+        constexpr uint64_t kFaultRobotNameMismatch          = 1ULL << 39;
 
-        constexpr uint64_t kFaultCollisionDetected          = 1ULL << 36; // Collision detected and goes into fault mode
-        constexpr uint64_t kFaultRecoveryRequired           = 1ULL << 37; // Recovery required
+        constexpr uint64_t kFaultCollisionDetected          = 1ULL << 40; // Collision detected and goes into fault mode
+        constexpr uint64_t kFaultRecoveryRequired           = 1ULL << 41; // Recovery required
 
         // --- Configuration Validation ---
-        constexpr uint64_t kInvalidControlTypeCombination         = 1ULL << 38; // Control type combination is invalid or not supported
-        constexpr uint64_t kCartesianControlRequirePositionTarget = 1ULL << 39; // Cartesian control require position target
-        constexpr uint64_t kControlStrategyNotAvailable           = 1ULL << 40; // Control strategy is not available
-        constexpr uint64_t kWaypointControlStrategyNotAllowed     = 1ULL << 41; // Waypoint control strategy is invalid
-        constexpr uint64_t kWaypointTargetTypeNotAllowed          = 1ULL << 42; // Waypoint target type is invalid
-        constexpr uint64_t kWaypointSmoothingMethodNotAllowed     = 1ULL << 43; // Waypoint smoothing method is invalid
-        constexpr uint64_t kPlaybackControlRequirePositionTarget  = 1ULL << 44; // Playback control require position target
-        constexpr uint64_t kPlaybackControlStartPoseNotReachable  = 1ULL << 45; // Playback control cannot reach start pose
+        constexpr uint64_t kInvalidControlTypeCombination         = 1ULL << 42; // Control type combination is invalid or not supported
+        constexpr uint64_t kCartesianControlRequirePositionTarget = 1ULL << 43; // Cartesian control require position target
+        constexpr uint64_t kControlStrategyNotAvailable           = 1ULL << 44; // Control strategy is not available
+        constexpr uint64_t kWaypointControlStrategyNotAllowed     = 1ULL << 45; // Waypoint control strategy is invalid
+        constexpr uint64_t kWaypointTargetTypeNotAllowed          = 1ULL << 46; // Waypoint target type is invalid
+        constexpr uint64_t kWaypointSmoothingMethodNotAllowed     = 1ULL << 47; // Waypoint smoothing method is invalid
+        constexpr uint64_t kPlaybackControlRequirePositionTarget  = 1ULL << 48; // Playback control require position target
+        constexpr uint64_t kPlaybackControlStartPoseNotReachable  = 1ULL << 49; // Playback control cannot reach start pose
 
         constexpr uint64_t kUnknown                               = 1ULL << 63;
     };
@@ -273,7 +277,7 @@ namespace robot::platform {
 
             /** Echo of the configured strategy; not changed by SdkCommandReq (use SdkConfigReq). */
             ControlStrategy     activated_control_strategy = ControlStrategy::kJoint;
-            uint8_t             enable_jog = 0;  // 1: jog arm of union; 0: absolute arm
+            uint8_t             enable_jog = 0;
             uint8_t             target_count = 0;
             SinglePointTarget   target[MAX_WAYPOINTS];
         }payload;
@@ -426,6 +430,7 @@ namespace robot::platform {
         uint32_t magic_header = MAGIC_HEADER; 
         uint16_t client_id;                   
         uint32_t sequence_id;                 // Anti-replay counter
+        uint16_t telemetry_port;              // Port for telemetry data
         uint64_t timestamp_us;                // Integrity timestamp
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };

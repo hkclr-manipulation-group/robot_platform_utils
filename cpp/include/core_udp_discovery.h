@@ -27,6 +27,7 @@ struct DiscoveredServer {
  *
  * @param client_id         Panel / SDK client id (HMAC + session bookkeeping).
  * @param core_request_port Destination UDP port (same as CoreUdpServer local_port).
+ * @param telemetry_port    Telemetry UDP port (same as CoreUdpServer telemetry port).
  * @param local_ack_port    Local bind port for the handshake reply (same as CoreUdpClient ack port).
  * @param probe_ips         Unicast, multicast, and/or 255.255.255.255 targets.
  * @param timeout_ms        Per-attempt wait for SdkHandshakeRes.
@@ -37,6 +38,7 @@ struct DiscoveredServer {
 DiscoveredServer discoverRtServerViaHandshake(
     uint16_t client_id,
     int core_request_port,
+    int telemetry_port,
     int local_ack_port,
     const std::vector<std::string>& probe_ips,
     float timeout_ms = 1500.0f,
@@ -46,12 +48,13 @@ DiscoveredServer discoverRtServerViaHandshake(
 inline DiscoveredServer discoverRtServerViaHandshake(
     uint16_t client_id,
     int core_request_port,
+    int telemetry_port,
     int local_ack_port,
     const std::string& probe_ip,
     float timeout_ms = 1500.0f,
     int max_attempts_per_probe = 2) {
     return discoverRtServerViaHandshake(
-        client_id, core_request_port, local_ack_port,
+        client_id, core_request_port, telemetry_port, local_ack_port,
         std::vector<std::string>{probe_ip}, timeout_ms, max_attempts_per_probe);
 }
 
@@ -63,6 +66,7 @@ inline DiscoveredServer discoverRtServerViaHandshake(
 std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     uint16_t client_id,
     int core_request_port,
+    int telemetry_port,
     int local_ack_port,
     const std::vector<std::string>& probe_ips,
     float timeout_ms = 200.0f,

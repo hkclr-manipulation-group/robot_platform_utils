@@ -91,8 +91,6 @@ namespace robot::platform {
                     using T = std::decay_t<decltype(alt)>;
                     if constexpr (std::is_same_v<T, std::monostate>) {
                         return false;
-                    } else if constexpr (std::is_same_v<T, robot::platform::SdkHandshakeRes>) {
-                        return alt.request_client_id == client_id;
                     } else {
                         return alt.request_client_id == client_id && alt.request_sequence_id == sequence_id;
                     }
@@ -253,6 +251,7 @@ namespace robot::platform {
     template <typename UnpackT, typename PackT, typename AckT>
     void CoreUdpClient<UnpackT, PackT, AckT>::close(){
         is_running_ = false;
+        ack_cv_.notify_all();
         if (ack_thread_.joinable()) {
             ack_thread_.join();
         }

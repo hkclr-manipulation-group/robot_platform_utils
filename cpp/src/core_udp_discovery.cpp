@@ -410,6 +410,7 @@ void sendDiscoveryHandshakeBurst(
 DiscoveredServer discoverRtServerViaHandshake(
     uint16_t client_id,
     int core_request_port,
+    int telemetry_port,
     int local_ack_port,
     const std::vector<std::string>& probe_ips,
     float timeout_ms,
@@ -456,6 +457,7 @@ DiscoveredServer discoverRtServerViaHandshake(
     handshake.client_id = client_id;
     uint32_t sequence_id = nextDiscoveryHandshakeSequenceId();
     int sequence_resync_remaining = 16;
+    handshake.telemetry_port = telemetry_port;
 
     std::ostringstream tried;
     for (size_t ti = 0; ti < targets.size(); ++ti) {
@@ -542,6 +544,7 @@ DiscoveredServer discoverRtServerViaHandshake(
 std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     uint16_t client_id,
     int core_request_port,
+    int telemetry_port,
     int local_ack_port,
     const std::vector<std::string>& probe_ips,
     float timeout_ms,
@@ -592,6 +595,7 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
         SdkHandshakeReq handshake{};
         handshake.client_id = client_id;
         handshake.sequence_id = sequence_id;
+        handshake.telemetry_port = telemetry_port;
         sendDiscoveryHandshakeBurst(
             node, targets, core_request_port, handshake, send_buffer_size);
 

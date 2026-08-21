@@ -10,6 +10,7 @@
 #include "client_keys.h"
 #include "core_udp_client.h"
 #include "platform_serialization.h"
+#include "platform_state.h"
 #include "time_utils.h"
 
 namespace {
@@ -18,122 +19,124 @@ using namespace robot::platform;
 
 constexpr uint16_t kClientId = 10002;
 const std::string kServerIp = "127.0.0.1";
-const std::string kMulticastIp = "239.255.77.88";
-constexpr int kServerPort = 30200;
-constexpr int kMulticastPort = 30201;
+constexpr int kCoreRequestPort = 30200;
+constexpr int kTelemetryPort = 30202;
 constexpr int kReceiveAckPort = 40002;
 constexpr int kReceiveTimeoutUs = 200000;
 constexpr float kAckPollMs = 10.0f;
 
-std::atomic<bool> stop_requested(false);
+std::atomic<bool> stopRequested(false);
 
-void handle_sig(int)
+void handleSig(int)
 {
-    stop_requested = true;
+    stopRequested = true;
 }
 
-bool unpack_srv_state(const std::uint8_t* buffer, std::size_t size, SrvState& out)
+bool unpackSrvState(const std::uint8_t* buffer, std::size_t size, SrvState& out)
 {
-    if (!serialization::unpackMessage(buffer, size, out, getClientHmacKey)) {
-        std::cerr << "Failed to unpack SrvState" << std::endl;
-        return false;
-    }
-    return true;
+    out = SrvState{};
+    out.magic_header = 0;
+    return serialization::unpackMessage(buffer, size, out, getClientHmacKey);
 }
 
-bool pack_core_request(const CoreRequestVariantPtr& request, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size)
+bool packCoreRequest(
+    const CoreRequestVariantPtr& request,
+    std::uint8_t* buffer,
+    std::size_t buffer_size,
+    std::size_t& written_size)
 {
-    if (!serialization::packMessage(request, buffer, buffer_size, written_size, getClientHmacKey)) {
-        std::cerr << "Failed to pack CoreRequestVariantPtr" << std::endl;
-        return false;
-    }
-    return true;
+    return serialization::packMessage(request, buffer, buffer_size, written_size, getClientHmacKey);
 }
 
-bool unpack_core_response(const std::uint8_t* buffer, std::size_t size, CoreResponseVariantPtr& out)
+bool unpackCoreResponse(const std::uint8_t* buffer, std::size_t size, CoreResponseVariantPtr& out)
 {
-    if (!serialization::unpackMessage(buffer, size, out, getClientHmacKey)) {
-        std::cerr << "Failed to unpack CoreResponseVariantPtr" << std::endl;
-        return false;
-    }
-    return true;
+    out = nullptr;
+    return serialization::unpackMessage(buffer, size, out, getClientHmacKey);
 }
 
-uint32_t perform_handshake(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client) {
-    constexpr uint16_t handshake_seq = 1;
+std::string resolveKeysPath()
+{
+#ifdef PROJECT_ROOT_DIR
+    return std::string(PROJECT_ROOT_DIR) + "/cuarm_rt_control/src/keys.json";
+#else
+    return "src/keys.json";
+#endif
+}
+
+uint32_t performHandshake(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client)
+{
+    constexpr uint16_t handshakeSeq = 1;
     constexpr int kMaxAttempts = 3;
-    
+
     SdkHandshakeReq handshake{};
     handshake.client_id = kClientId;
-    handshake.sequence_id = handshake_seq;
-    
+    handshake.sequence_id = handshakeSeq;
+    handshake.telemetry_port = kTelemetryPort;
+
     for (int attempt = 1; attempt <= kMaxAttempts; ++attempt) {
-        try {
-            handshake.timestamp_us = static_cast<uint64_t>(get_time_now());
-            CoreRequestVariantPtr request = std::make_unique<CoreRequestVariantPtr::element_type>(handshake);
-            client.send(request);
+        handshake.timestamp_us = static_cast<uint64_t>(get_time_now());
+        CoreRequestVariantPtr request = std::make_unique<CoreRequestVariant>(handshake);
+        client.send(request);
 
-            CoreResponseVariantPtr ack = client.waitAck(kClientId, handshake_seq, 3000.0f);
-            if (!ack) {
-                throw std::runtime_error("Handshake timed out");
-            }
-
-            if (!std::holds_alternative<SdkHandshakeRes>(*ack)) {
-                throw std::runtime_error("Unexpected handshake response type");
-            }
-
-            const auto& handshake_res = std::get<SdkHandshakeRes>(*ack);
-            if (handshake_res.payload.status != CommandResponseStatus::kSuccess) {
-                throw std::runtime_error("Handshake rejected, status: " + enumToString(handshake_res.payload.status));
-            }
-
-            std::cout << "Client 10002 handshake success on attempt " << attempt 
-                      << ", session_id=" << handshake_res.assigned_session_id << std::endl;
-            
-            return handshake_res.assigned_session_id;
-
-        } catch (const std::runtime_error& e) {
-            std::cerr << "Attempt " << attempt << " failed: " << e.what() << std::endl;
+        CoreResponseVariantPtr ack = client.waitAck(kClientId, handshakeSeq, 3000.0f);
+        if (!ack || !std::holds_alternative<SdkHandshakeRes>(*ack)) {
             if (attempt == kMaxAttempts) {
-                throw std::runtime_error("Handshake failed after 10 attempts for client 10002");
+                throw std::runtime_error("Handshake failed for client 10002");
             }
-            // Optional: Add std::this_thread::sleep_for here to back off before retrying
+            continue;
         }
+
+        const auto& handshakeRes = std::get<SdkHandshakeRes>(*ack);
+        if (handshakeRes.payload.status != CommandResponseStatus::kSuccess) {
+            throw std::runtime_error(
+                "Handshake rejected, status: " + enumToString(handshakeRes.payload.status));
+        }
+
+        std::cout << "Client 10002 handshake success on attempt " << attempt
+                  << ", session_id=" << handshakeRes.assigned_session_id << std::endl;
+        return handshakeRes.assigned_session_id;
     }
+
     throw std::runtime_error("Handshake failed for client 10002");
 }
 
-void send_demo_config(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client, uint32_t session_id, uint32_t sequence_id, bool read_only)
+void sendDemoConfig(
+    CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client,
+    uint32_t sessionId,
+    uint32_t sequenceId,
+    bool readOnly)
 {
     SdkConfigReq config{};
     config.client_id = kClientId;
-    config.session_id = session_id;
-    config.sequence_id = sequence_id;
+    config.session_id = sessionId;
+    config.sequence_id = sequenceId;
     config.timestamp_us = static_cast<uint64_t>(get_time_now());
-    config.payload.read_only = read_only;
-    CoreRequestVariantPtr request = std::make_unique<CoreRequestVariantPtr::element_type>(config);
+    config.payload.read_only = readOnly;
+    CoreRequestVariantPtr request = std::make_unique<CoreRequestVariant>(config);
     client.send(request);
 
-    CoreResponseVariantPtr ack = client.waitAck(kClientId, sequence_id, 3000.0f);
-    if (!ack) {
+    CoreResponseVariantPtr ack = client.waitAck(kClientId, sequenceId, 3000.0f);
+    if (!ack || !std::holds_alternative<SdkConfigRes>(*ack)) {
         throw std::runtime_error("Config ack timed out for client 10002");
     }
 
-    if (!std::holds_alternative<SdkConfigRes>(*ack)) {
-        throw std::runtime_error("Unexpected config response type");
-    }
-
-    const auto& config_res = std::get<SdkConfigRes>(*ack);
+    const auto& configRes = std::get<SdkConfigRes>(*ack);
     std::cout << "Client 10002 config response status="
-              << enumToString(config_res.payload.status) << std::endl;
+              << enumToString(configRes.payload.status) << std::endl;
+    if (configRes.payload.status != CommandResponseStatus::kSuccess) {
+        throw std::runtime_error("Config rejected for client 10002");
+    }
 }
 
-void send_demo_command(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client, uint32_t session_id, uint32_t sequence_id)
+void sendDemoCommand(
+    CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client,
+    uint32_t sessionId,
+    uint32_t sequenceId)
 {
     SdkCommandReq command{};
     command.client_id = kClientId;
-    command.session_id = session_id;
-    command.sequence_id = sequence_id;
+    command.session_id = sessionId;
+    command.sequence_id = sequenceId;
     command.timestamp_us = static_cast<uint64_t>(get_time_now());
     std::snprintf(command.payload.robot_name, sizeof(command.payload.robot_name), "test_robot");
     command.payload.arm_size = 1;
@@ -144,70 +147,63 @@ void send_demo_command(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreRespon
     command.payload.activated_control_strategy = ControlStrategy::kJoint;
     command.payload.target_count = 1;
 
-    CoreRequestVariantPtr request = std::make_unique<CoreRequestVariantPtr::element_type>(command);
+    CoreRequestVariantPtr request = std::make_unique<CoreRequestVariant>(command);
     client.send(request);
 
-    CoreResponseVariantPtr ack = client.waitAck(kClientId, sequence_id, 3000.0f);
-    if (!ack) {
+    CoreResponseVariantPtr ack = client.waitAck(kClientId, sequenceId, 3000.0f);
+    if (!ack || !std::holds_alternative<SdkCommandRes>(*ack)) {
         throw std::runtime_error("Command ack timed out for client 10002");
     }
 
-    if (!std::holds_alternative<SdkCommandRes>(*ack)) {
-        throw std::runtime_error("Unexpected command response type");
-    }
-
-    const auto& command_res = std::get<SdkCommandRes>(*ack);
+    const auto& commandRes = std::get<SdkCommandRes>(*ack);
     std::cout << "Client 10002 command response status="
-              << enumToString(command_res.payload.status) << std::endl;
+              << enumToString(commandRes.payload.status) << std::endl;
+    if (commandRes.payload.status != CommandResponseStatus::kSuccess) {
+        throw std::runtime_error("Command rejected for client 10002");
+    }
 }
 
 }  // namespace
 
 int main()
 {
-    std::signal(SIGINT, handle_sig);
-    int sequence_id = 1;
+    std::signal(SIGINT, handleSig);
+    uint32_t sequenceId = 1;
 
     try {
-#ifdef PROJECT_ROOT_DIR
-        const std::string keys_path = std::string(PROJECT_ROOT_DIR) + "/cuarm_rt_control/src/keys.json";
-#else
-        const std::string keys_path = "keys.json";
-#endif
-        if (!loadClientKeys(keys_path)) {
-            throw std::runtime_error("Failed to load client keys from " + keys_path);
+        if (!loadClientKeys(resolveKeysPath())) {
+            throw std::runtime_error("Failed to load client keys from " + resolveKeysPath());
         }
 
         CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr> client(
             kServerIp,
-            kServerPort,
-            kMulticastIp,
-            kMulticastPort,
+            kCoreRequestPort,
+            kTelemetryPort,
             kReceiveAckPort,
-            unpack_srv_state,
-            pack_core_request,
-            unpack_core_response,
+            unpackSrvState,
+            packCoreRequest,
+            unpackCoreResponse,
             kAckPollMs);
 
-        std::cout << "Client 10002 connected to server " << kServerIp << ":" << kServerPort
-                  << ", multicast " << kMulticastIp << ":" << kMulticastPort << std::endl;
+        std::cout << "Client 10002 connected to server " << kServerIp << ":" << kCoreRequestPort
+                  << ", telemetry port " << kTelemetryPort << std::endl;
 
         std::cout << "Perform handshake." << std::endl;
-        const uint32_t session_id = perform_handshake(client);
+        const uint32_t sessionId = performHandshake(client);
         std::cout << "--------------------------------" << std::endl;
         std::cout << "Send demo config, read_only=true." << std::endl;
-        send_demo_config(client, session_id, sequence_id++, true);
+        sendDemoConfig(client, sessionId, sequenceId++, true);
         std::cout << "--------------------------------" << std::endl;
         std::cout << "Send demo config, read_only=false." << std::endl;
-        send_demo_config(client, session_id, sequence_id++, false);
+        sendDemoConfig(client, sessionId, sequenceId++, false);
         std::cout << "--------------------------------" << std::endl;
         std::cout << "Send demo command." << std::endl;
-        send_demo_command(client, session_id, sequence_id++);
+        sendDemoCommand(client, sessionId, sequenceId++);
         std::cout << "--------------------------------" << std::endl;
 
-        while (!stop_requested) {
-            send_demo_command(client, session_id, sequence_id++);
-            
+        while (!stopRequested) {
+            sendDemoCommand(client, sessionId, sequenceId++);
+
             SrvState state{};
             if (client.receive(state, kReceiveTimeoutUs)) {
                 std::cout << "Client 10002 received SrvState seq=" << state.sequence_id

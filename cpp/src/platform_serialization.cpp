@@ -493,6 +493,7 @@ namespace robot::platform::serialization {
             writeRaw(value.client_id, cursor, remaining);
 
             writeRaw(value.sequence_id, cursor, remaining);
+            writeRaw(value.telemetry_port, cursor, remaining);
             writeRaw(value.timestamp_us, cursor, remaining);
         }catch (const std::exception& e) {
             catchToBytesError("catchToBytesError:toBytes(SdkHandshakeReq)", e, value, buffer_size, written_size, write_phase);
@@ -562,6 +563,7 @@ namespace robot::platform::serialization {
             writeEnum(MessageType::kSdkReleaseControlRes, cursor, remaining);
             writeRaw(value.request_client_id, cursor, remaining);
             
+            writeRaw(value.request_sequence_id, cursor, remaining);
             writeRaw(value.request_received_us, cursor, remaining);
             writeRaw(value.response_sent_us, cursor, remaining);
 
@@ -605,9 +607,10 @@ namespace robot::platform::serialization {
 
         try{
             writeRaw(value.magic_header, cursor, remaining);
-            writeEnum(MessageType::kSdkReleaseControlRes, cursor, remaining);
+            writeEnum(MessageType::kSdkRecoveryRes, cursor, remaining);
             writeRaw(value.request_client_id, cursor, remaining);
             
+            writeRaw(value.request_sequence_id, cursor, remaining);
             writeRaw(value.request_received_us, cursor, remaining);
             writeRaw(value.response_sent_us, cursor, remaining);
 
@@ -925,6 +928,7 @@ namespace robot::platform::serialization {
 
         readRaw(cursor, value.client_id);
         readRaw(cursor, value.sequence_id);
+        readRaw(cursor, value.telemetry_port);
         readRaw(cursor, value.timestamp_us);
 
         return verifyReadBuffer("fromBytes(SdkHandshakeReq)", cursor, buffer, buffer_size, write_phase);
@@ -974,6 +978,7 @@ namespace robot::platform::serialization {
         write_phase.push_back(std::make_pair("after message type", cursor - buffer));
 
         readRaw(cursor, value.request_client_id);
+        readRaw(cursor, value.request_sequence_id);
         readRaw(cursor, value.request_received_us);
         readRaw(cursor, value.response_sent_us);
 
@@ -1004,6 +1009,7 @@ namespace robot::platform::serialization {
         write_phase.push_back(std::make_pair("after message type", cursor - buffer));
 
         readRaw(cursor, value.request_client_id);
+        readRaw(cursor, value.request_sequence_id);
         readRaw(cursor, value.request_received_us);
         readRaw(cursor, value.response_sent_us);
 
