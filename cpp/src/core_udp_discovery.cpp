@@ -421,6 +421,9 @@ DiscoveredServer discoverRtServerViaHandshake(
     if (core_request_port <= 0 || local_ack_port <= 0) {
         throw std::invalid_argument("discoverRtServerViaHandshake: invalid ports");
     }
+    if (telemetry_port <= 0) {
+        throw std::invalid_argument("discoverRtServerViaHandshake: telemetry_port must be > 0");
+    }
     if (max_attempts_per_probe < 1) {
         max_attempts_per_probe = 1;
     }
@@ -554,6 +557,9 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     }
     if (core_request_port <= 0 || local_ack_port <= 0) {
         throw std::invalid_argument("discoverAllRtServersViaHandshake: invalid ports");
+    }
+    if (telemetry_port <= 0) {
+        throw std::invalid_argument("discoverAllRtServersViaHandshake: telemetry_port must be > 0");
     }
     if (max_attempts_per_probe < 1) {
         max_attempts_per_probe = 1;

@@ -138,7 +138,7 @@ YAML::Node loadYamlFileCached(const std::filesystem::path& path) {
 
 YAML::Node processImportsRecursive(
     const YAML::Node& config,
-    const std::string& base_dir,
+    const std::string& import_root,
     std::unordered_set<std::string>& visited,
     std::vector<std::pair<std::string, FileTime>>& dependencies) {
     auto processSingleImport = [&](const std::string& import_path) -> YAML::Node {
@@ -146,7 +146,7 @@ YAML::Node processImportsRecursive(
         if (!import_path.empty() && import_path.front() == '/') {
             full_path = std::filesystem::path(import_path);
         } else {
-            full_path = std::filesystem::path(base_dir) / import_path;
+            full_path = std::filesystem::path(import_root) / import_path;
         }
         full_path = full_path.lexically_normal();
 
@@ -162,9 +162,8 @@ YAML::Node processImportsRecursive(
         dependencies.emplace_back(visit_key, *mtime);
 
         YAML::Node imported_config = loadYamlFileCached(full_path);
-        const std::string import_base = full_path.parent_path().string();
         YAML::Node processed = processImportsRecursive(
-            imported_config, import_base, visited, dependencies);
+            imported_config, import_root, visited, dependencies);
         visited.erase(visit_key);
         return processed;
     };
@@ -178,7 +177,7 @@ YAML::Node processImportsRecursive(
                 const YAML::Node imported = processSingleImport(child.as<std::string>());
                 mergeYamlNodes(result, imported);
             } else {
-                result[key] = processImportsRecursive(child, base_dir, visited, dependencies);
+                result[key] = processImportsRecursive(child, import_root, visited, dependencies);
             }
         }
         return result;
@@ -187,7 +186,7 @@ YAML::Node processImportsRecursive(
     if (config.IsSequence()) {
         YAML::Node result(YAML::NodeType::Sequence);
         for (std::size_t i = 0; i < config.size(); ++i) {
-            result.push_back(processImportsRecursive(config[i], base_dir, visited, dependencies));
+            result.push_back(processImportsRecursive(config[i], import_root, visited, dependencies));
         }
         return result;
     }
