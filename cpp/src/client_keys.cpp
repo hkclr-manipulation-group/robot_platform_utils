@@ -1,4 +1,5 @@
 #include "client_keys.h"
+#include "config_loader.h"
 
 #include <iostream>
 #include <mutex>
@@ -60,7 +61,7 @@ bool registerClientKey(
 bool loadClientKeys(const std::string& json_path) {
     std::lock_guard<std::mutex> lock(keyStoreMutex());
     try {
-        YAML::Node root = YAML::LoadFile(json_path);
+        YAML::Node root = loadYamlFile(json_path);
         if (!root || !root["client_registry"]) {
             std::cerr << "loadClientKeys: missing client_registry in " << json_path << std::endl;
             return false;

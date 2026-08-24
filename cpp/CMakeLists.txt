@@ -143,6 +143,7 @@ if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_PYTHON_LIB)
 
     set(PYTHON_SOURCES
         src/config_loader.cpp
+        src/robot_config.cpp
         src/pybind11/bindings.cpp
     )
     pybind11_add_module(config_loader ${PYTHON_SOURCES})
@@ -162,7 +163,8 @@ if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_CPP_TESTS)
     find_package(Threads REQUIRED)
     
     set(TEST_NAMES 
-        test_config_loader 
+        test_config_loader
+        test_robot_config
         test_cuarm_tcp_server
         test_cuarm_tcp_client
         test_cuarm_udp_server
