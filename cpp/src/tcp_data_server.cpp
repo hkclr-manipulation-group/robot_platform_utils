@@ -131,7 +131,18 @@ bool TcpDataServer::sendDownloadStream(std::uint32_t sequence, const std::string
     return sendFrame(tcp_data::MessageKind::kBlobDownloadEnd, sequence, nullptr, 0);
 }
 
-bool TcpDataServer::handleClient(DataChannelHandler& handler, int timeout_usec) {
+std::uint32_t TcpDataServer::authorizeRequest(const SessionAuthValidator& auth_validator,
+                                              const tcp_data::RpcSessionAuth& auth,
+                                              std::string& error_message) const {
+    if (!auth_validator) {
+        error_message = "session auth validator not configured";
+        return 503;
+    }
+    return auth_validator(auth, error_message);
+}
+
+bool TcpDataServer::handleClient(DataChannelHandler& handler, int timeout_usec,
+                                 const SessionAuthValidator& auth_validator) {
     BlobReceipt active{};
     std::uint32_t active_sequence = 0;
     bool transfer_open = false;
@@ -174,6 +185,17 @@ bool TcpDataServer::handleClient(DataChannelHandler& handler, int timeout_usec) 
 
         switch (kind) {
             case tcp_data::MessageKind::kPing: {
+                tcp_data::RpcSessionAuth auth{};
+                if (!tcp_data::decodeRpcSessionAuth(payload, payload_size, auth)) {
+                    sendError(header->sequence, "invalid Ping auth payload", timeout_usec);
+                    return false;
+                }
+                std::string auth_error;
+                const std::uint32_t auth_status = authorizeRequest(auth_validator, auth, auth_error);
+                if (auth_status != 0) {
+                    sendAck(header->sequence, auth_status, timeout_usec);
+                    break;
+                }
                 if (!sendFrame(tcp_data::MessageKind::kPong, header->sequence, nullptr, 0)) {
                     return false;
                 }
@@ -184,22 +206,18 @@ bool TcpDataServer::handleClient(DataChannelHandler& handler, int timeout_usec) 
                 active_sequence = header->sequence;
                 transfer_open = true;
 
-                std::size_t offset = 0;
-                std::uint32_t name_len = 0;
+                tcp_data::RpcSessionAuth auth{};
                 std::uint32_t total_size = 0;
-                if (!readU32(payload, payload_size, offset, name_len)) {
+                if (!tcp_data::decodeBlobBeginPayload(payload, payload_size, auth, active.name, total_size)) {
                     sendError(header->sequence, "invalid BlobBegin payload", timeout_usec);
                     return false;
                 }
-                if (offset + name_len + sizeof(total_size) > payload_size) {
-                    sendError(header->sequence, "invalid BlobBegin payload", timeout_usec);
-                    return false;
-                }
-                active.name.assign(reinterpret_cast<const char*>(payload + offset), name_len);
-                offset += name_len;
-                if (!readU32(payload, payload_size, offset, total_size)) {
-                    sendError(header->sequence, "invalid BlobBegin payload", timeout_usec);
-                    return false;
+                std::string auth_error;
+                const std::uint32_t auth_status = authorizeRequest(auth_validator, auth, auth_error);
+                if (auth_status != 0) {
+                    transfer_open = false;
+                    sendAck(header->sequence, auth_status, timeout_usec);
+                    break;
                 }
                 active.data.assign(total_size, 0);
                 sendAck(header->sequence, 0, timeout_usec);
@@ -240,14 +258,21 @@ bool TcpDataServer::handleClient(DataChannelHandler& handler, int timeout_usec) 
                 break;
             }
             case tcp_data::MessageKind::kRpcRequest: {
+                tcp_data::RpcSessionAuth auth{};
                 std::uint32_t service_id = 0;
                 std::uint32_t method_id = 0;
                 const std::uint8_t* request_body = nullptr;
                 std::size_t request_body_size = 0;
-                if (!tcp_data::decodeRpcRequest(payload, payload_size, service_id, method_id, request_body,
+                if (!tcp_data::decodeRpcRequest(payload, payload_size, auth, service_id, method_id, request_body,
                                                 request_body_size)) {
                     sendError(header->sequence, "invalid RpcRequest payload", timeout_usec);
                     return false;
+                }
+                std::string auth_error;
+                if (const std::uint32_t auth_status = authorizeRequest(auth_validator, auth, auth_error);
+                    auth_status != 0) {
+                    sendRpcResponse(header->sequence, auth_status, {});
+                    break;
                 }
 
                 RpcResult rpc = handler.onRpcRequest(service_id, method_id, request_body, request_body_size);
@@ -275,7 +300,8 @@ bool TcpDataServer::handleClient(DataChannelHandler& handler, int timeout_usec) 
     return true;
 }
 
-void TcpDataServer::serveForever(DataChannelHandler& handler, const std::function<bool()>& stop_requested) {
+void TcpDataServer::serveForever(DataChannelHandler& handler, const std::function<bool()>& stop_requested,
+                                 SessionAuthValidator auth_validator) {
     constexpr int kTimeoutUsec = 500'000;
 
     while (true) {
@@ -286,7 +312,7 @@ void TcpDataServer::serveForever(DataChannelHandler& handler, const std::functio
             tcp_server_wait_client(node_, kTimeoutUsec, buffer_size_);
             continue;
         }
-        handleClient(handler, kTimeoutUsec);
+        handleClient(handler, kTimeoutUsec, auth_validator);
     }
 }
 

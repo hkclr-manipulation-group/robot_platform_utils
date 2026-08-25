@@ -2,6 +2,7 @@
 #define TCP_DATA_CLIENT_H
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,8 @@ extern "C" {
 namespace robot::platform {
 
 /**
- * TCP data channel client (v2): Ping, blob upload/download, RPC services.
+ * TCP data channel client (v3): Ping, blob upload/download, RPC services.
+ * Authenticated requests carry UDP session credentials (Scheme A).
  * Real-time motion remains on UDP.
  */
 class TcpDataClient {
@@ -43,6 +45,15 @@ public:
                  int connect_timeout_usec = kDefaultConnectTimeoutUsec);
     bool isConnected() const;
 
+    /**
+     * Bind UDP session credentials used on authenticated TCP requests.
+     * @p next_sequence should allocate the next UDP core sequence id (shared with CoreUdpClient).
+     */
+    void setSessionCredentials(std::uint16_t client_id, std::uint32_t session_id,
+                               std::function<std::uint32_t()> allocate_core_sequence);
+    void clearSessionCredentials();
+    bool hasSessionCredentials() const;
+
     Result ping(int timeout_usec = kDefaultTimeoutUsec);
 
     Result uploadBlob(const std::string& name, const std::uint8_t* data, std::size_t size,
@@ -68,6 +79,9 @@ public:
 
     Result getCapabilities(std::vector<std::uint8_t>& capabilities_body, int timeout_usec = kDefaultTimeoutUsec);
 
+    Result callNetworkConfig(tcp_data::NetworkMethod method, const std::vector<std::uint8_t>& request_body,
+                             tcp_data::NetworkConfigData& response, int timeout_usec = kDefaultTimeoutUsec);
+
     void close();
 
 private:
@@ -79,6 +93,14 @@ private:
     Result receiveFrame(int timeout_usec);
     Result receiveDownloadStream(std::uint32_t sequence, const std::string& expected_name,
                                  std::vector<std::uint8_t>& data, int timeout_usec);
+
+    Result requireSessionCredentials() const;
+    tcp_data::RpcSessionAuth nextSessionAuth();
+
+    std::uint16_t session_client_id_ = 0;
+    std::uint32_t session_id_ = 0;
+    std::function<std::uint32_t()> allocate_core_sequence_;
+    bool has_session_credentials_ = false;
 
     tcp_node* node_ = nullptr;
     int buffer_size_ = 65536;

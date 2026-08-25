@@ -7,7 +7,7 @@ namespace robot::platform::tcp_data {
 
 /** Magic for TCP data-channel application messages ("SP2D"). */
 constexpr std::uint32_t kMagic = 0x53503244u;
-constexpr std::uint16_t kVersion = 2u;
+constexpr std::uint16_t kVersion = 3u;
 
 enum class MessageKind : std::uint16_t {
     kPing = 1,

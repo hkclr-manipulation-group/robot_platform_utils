@@ -17,6 +17,10 @@ namespace robot::platform {
     #define MAX_GRIPPER_JOINT_SIZE  6
     #define MAX_NAME_SIZE           30
     #define MAX_WAYPOINTS           32
+    #define MAX_NETWORK_IP_SIZE     16
+    #define MAX_NETWORK_DNS_SIZE    64
+    #define MAX_WIFI_SSID_SIZE      64
+    #define MAX_WIFI_PASSWORD_SIZE  64
     #define MAGIC_HEADER            0x484B434C // "HKCL" in ASCII
     #ifndef HMAC_KEY_SIZE
         #define HMAC_KEY_SIZE           16U
@@ -196,6 +200,13 @@ namespace robot::platform {
         kSdkReleaseControlRes,
         kSdkRecoveryReq,
         kSdkRecoveryRes,
+    };
+
+    enum class NetworkConfigAction : uint8_t {
+        kGet = 0,
+        kSetWifi = 1,
+        kSetEthStatic = 2,
+        kFactoryReset = 3,
     };
     
 

@@ -81,6 +81,40 @@ bool TcpDataClient::isConnected() const {
     return connected_ && node_ != nullptr;
 }
 
+void TcpDataClient::setSessionCredentials(std::uint16_t client_id, std::uint32_t session_id,
+                                          std::function<std::uint32_t()> allocate_core_sequence) {
+    session_client_id_ = client_id;
+    session_id_ = session_id;
+    allocate_core_sequence_ = std::move(allocate_core_sequence);
+    has_session_credentials_ = static_cast<bool>(allocate_core_sequence_);
+}
+
+void TcpDataClient::clearSessionCredentials() {
+    session_client_id_ = 0;
+    session_id_ = 0;
+    allocate_core_sequence_ = nullptr;
+    has_session_credentials_ = false;
+}
+
+bool TcpDataClient::hasSessionCredentials() const {
+    return has_session_credentials_;
+}
+
+TcpDataClient::Result TcpDataClient::requireSessionCredentials() const {
+    if (!has_session_credentials_ || !allocate_core_sequence_) {
+        return Result{false, "TcpDataClient: session credentials not set", 0};
+    }
+    return Result{true, "ok", 0};
+}
+
+tcp_data::RpcSessionAuth TcpDataClient::nextSessionAuth() {
+    tcp_data::RpcSessionAuth auth{};
+    auth.client_id = session_client_id_;
+    auth.session_id = session_id_;
+    auth.sequence_id = allocate_core_sequence_ ? allocate_core_sequence_() : 0;
+    return auth;
+}
+
 TcpDataClient::Result TcpDataClient::sendMessage(tcp_data::MessageKind kind, std::uint32_t sequence,
                                                  const std::uint8_t* payload, std::uint32_t payload_size) {
     Result result{};
@@ -185,8 +219,9 @@ TcpDataClient::Result TcpDataClient::expectAck(std::uint32_t sequence, int timeo
         sizeof(tcp_data::MessageHeader) + header->payload_size <= static_cast<std::uint32_t>(last_frame_len_)) {
         std::memcpy(&result.status_code, rx_buffer_.data() + sizeof(tcp_data::MessageHeader), sizeof(std::uint32_t));
     }
-    result.ok = true;
-    result.message = "ok";
+    result.ok = result.status_code == 0;
+    result.message = result.ok ? "ok"
+                               : ("TcpDataClient: request rejected (status " + std::to_string(result.status_code) + ")");
     return result;
 }
 
@@ -231,8 +266,19 @@ TcpDataClient::Result TcpDataClient::expectRpcResponse(std::uint32_t sequence, i
 }
 
 TcpDataClient::Result TcpDataClient::ping(int timeout_usec) {
+    Result creds = requireSessionCredentials();
+    if (!creds.ok) {
+        return creds;
+    }
+
     const std::uint32_t sequence = next_sequence_++;
-    Result sent = sendMessage(tcp_data::MessageKind::kPing, sequence, nullptr, 0);
+    std::vector<std::uint8_t> payload;
+    if (!tcp_data::encodeRpcSessionAuth(nextSessionAuth(), payload)) {
+        return Result{false, "TcpDataClient: failed to encode Ping auth", 0};
+    }
+
+    Result sent = sendMessage(tcp_data::MessageKind::kPing, sequence, payload.data(),
+                              static_cast<std::uint32_t>(payload.size()));
     if (!sent.ok) {
         return sent;
     }
@@ -243,8 +289,25 @@ TcpDataClient::Result TcpDataClient::ping(int timeout_usec) {
     }
 
     const auto* header = reinterpret_cast<const tcp_data::MessageHeader*>(rx_buffer_.data());
-    if (static_cast<tcp_data::MessageKind>(header->kind) != tcp_data::MessageKind::kPong ||
-        header->sequence != sequence) {
+    const auto kind = static_cast<tcp_data::MessageKind>(header->kind);
+    if (kind == tcp_data::MessageKind::kAck) {
+        Result ack{};
+        if (header->payload_size >= sizeof(std::uint32_t)
+            && sizeof(tcp_data::MessageHeader) + header->payload_size
+                   <= static_cast<std::uint32_t>(last_frame_len_)) {
+            std::memcpy(&ack.status_code, rx_buffer_.data() + sizeof(tcp_data::MessageHeader), sizeof(std::uint32_t));
+        }
+        ack.ok = ack.status_code == 0;
+        if (!ack.ok) {
+            ack.message = "TcpDataClient: ping unauthorized (status " + std::to_string(ack.status_code) + ")";
+        } else {
+            ack.message = "TcpDataClient: unexpected Ack on ping";
+            ack.ok = false;
+        }
+        return ack;
+    }
+
+    if (kind != tcp_data::MessageKind::kPong || header->sequence != sequence) {
         return Result{false, "TcpDataClient: invalid pong", 0};
     }
 
@@ -257,6 +320,10 @@ TcpDataClient::Result TcpDataClient::uploadBlob(const std::string& name, const s
     if (!isConnected()) {
         result.message = "TcpDataClient: not connected";
         return result;
+    }
+    Result creds = requireSessionCredentials();
+    if (!creds.ok) {
+        return creds;
     }
     if (name.empty()) {
         result.message = "TcpDataClient: blob name is empty";
@@ -272,15 +339,10 @@ TcpDataClient::Result TcpDataClient::uploadBlob(const std::string& name, const s
 
     const std::uint32_t transfer_id = next_sequence_++;
 
-    std::vector<std::uint8_t> begin_payload(sizeof(std::uint32_t) + name.size() + sizeof(std::uint32_t));
-    std::uint32_t name_len = static_cast<std::uint32_t>(name.size());
-    std::uint32_t total_size = static_cast<std::uint32_t>(size);
-    std::size_t offset = 0;
-    std::memcpy(begin_payload.data() + offset, &name_len, sizeof(name_len));
-    offset += sizeof(name_len);
-    std::memcpy(begin_payload.data() + offset, name.data(), name.size());
-    offset += name.size();
-    std::memcpy(begin_payload.data() + offset, &total_size, sizeof(total_size));
+    std::vector<std::uint8_t> begin_payload;
+    if (!tcp_data::encodeBlobBeginPayload(nextSessionAuth(), name, static_cast<std::uint32_t>(size), begin_payload)) {
+        return Result{false, "TcpDataClient: failed to encode BlobBegin payload", 0};
+    }
 
     Result sent = sendMessage(tcp_data::MessageKind::kBlobBegin, transfer_id, begin_payload.data(),
                               static_cast<std::uint32_t>(begin_payload.size()));
@@ -327,9 +389,14 @@ TcpDataClient::Result TcpDataClient::uploadBlob(const std::string& name, const s
 
 TcpDataClient::Result TcpDataClient::callRpc(tcp_data::ServiceId service, std::uint32_t method,
                                              const std::vector<std::uint8_t>& request_body, int timeout_usec) {
+    Result creds = requireSessionCredentials();
+    if (!creds.ok) {
+        return creds;
+    }
+
     const std::uint32_t sequence = next_sequence_++;
     std::vector<std::uint8_t> payload;
-    if (!tcp_data::encodeRpcRequest(service, method, request_body, payload)) {
+    if (!tcp_data::encodeRpcRequest(nextSessionAuth(), service, method, request_body, payload)) {
         return Result{false, "TcpDataClient: failed to encode RpcRequest", 0};
     }
 
@@ -471,6 +538,11 @@ TcpDataClient::Result TcpDataClient::receiveDownloadStream(std::uint32_t sequenc
 
 TcpDataClient::Result TcpDataClient::downloadBlob(const std::string& name, std::vector<std::uint8_t>& data,
                                                   int timeout_usec) {
+    Result creds = requireSessionCredentials();
+    if (!creds.ok) {
+        return creds;
+    }
+
     std::vector<std::uint8_t> request;
     if (!tcp_data::encodeNameRequest(name, request)) {
         return Result{false, "TcpDataClient: failed to encode download request", 0};
@@ -478,7 +550,7 @@ TcpDataClient::Result TcpDataClient::downloadBlob(const std::string& name, std::
 
     const std::uint32_t sequence = next_sequence_++;
     std::vector<std::uint8_t> payload;
-    if (!tcp_data::encodeRpcRequest(tcp_data::ServiceId::kStorage,
+    if (!tcp_data::encodeRpcRequest(nextSessionAuth(), tcp_data::ServiceId::kStorage,
                                     static_cast<std::uint32_t>(tcp_data::StorageMethod::kDownload), request,
                                     payload)) {
         return Result{false, "TcpDataClient: failed to encode RpcRequest", 0};
@@ -522,8 +594,22 @@ TcpDataClient::Result TcpDataClient::getCapabilities(std::vector<std::uint8_t>& 
     return rpc;
 }
 
+TcpDataClient::Result TcpDataClient::callNetworkConfig(tcp_data::NetworkMethod method,
+                                                       const std::vector<std::uint8_t>& request_body,
+                                                       tcp_data::NetworkConfigData& response, int timeout_usec) {
+    Result rpc = callRpc(tcp_data::ServiceId::kNetwork, static_cast<std::uint32_t>(method), request_body, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNetworkConfigData(rpc.response_body.data(), rpc.response_body.size(), response)) {
+        return Result{false, "TcpDataClient: failed to decode network response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
 void TcpDataClient::close() {
     connected_ = false;
+    clearSessionCredentials();
     if (node_) {
         tcp_close(node_);
         std::free(node_);

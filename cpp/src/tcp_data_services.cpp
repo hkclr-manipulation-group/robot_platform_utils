@@ -7,6 +7,15 @@
 namespace robot::platform::tcp_data {
 namespace {
 
+bool readU16(const std::uint8_t* data, std::size_t size, std::size_t& offset, std::uint16_t& out) {
+    if (offset + sizeof(std::uint16_t) > size) {
+        return false;
+    }
+    std::memcpy(&out, data + offset, sizeof(out));
+    offset += sizeof(std::uint16_t);
+    return true;
+}
+
 bool readU32(const std::uint8_t* data, std::size_t size, std::size_t& offset, std::uint32_t& out) {
     if (offset + sizeof(std::uint32_t) > size) {
         return false;
@@ -25,6 +34,12 @@ bool readU64(const std::uint8_t* data, std::size_t size, std::size_t& offset, st
     return true;
 }
 
+bool writeU16(std::vector<std::uint8_t>& out, std::uint16_t value) {
+    const auto* bytes = reinterpret_cast<const std::uint8_t*>(&value);
+    out.insert(out.end(), bytes, bytes + sizeof(value));
+    return true;
+}
+
 bool writeU32(std::vector<std::uint8_t>& out, std::uint32_t value) {
     const auto* bytes = reinterpret_cast<const std::uint8_t*>(&value);
     out.insert(out.end(), bytes, bytes + sizeof(value));
@@ -34,6 +49,19 @@ bool writeU32(std::vector<std::uint8_t>& out, std::uint32_t value) {
 bool writeU64(std::vector<std::uint8_t>& out, std::uint64_t value) {
     const auto* bytes = reinterpret_cast<const std::uint8_t*>(&value);
     out.insert(out.end(), bytes, bytes + sizeof(value));
+    return true;
+}
+
+bool writeU8(std::vector<std::uint8_t>& out, std::uint8_t value) {
+    out.push_back(value);
+    return true;
+}
+
+bool readU8(const std::uint8_t* data, std::size_t size, std::size_t& offset, std::uint8_t& out) {
+    if (offset + 1 > size) {
+        return false;
+    }
+    out = data[offset++];
     return true;
 }
 
@@ -136,27 +164,153 @@ bool decodeDownloadMeta(const std::uint8_t* data, std::size_t size, std::uint64_
     return readU64(data, size, offset, size_out);
 }
 
-bool encodeRpcRequest(ServiceId service, std::uint32_t method, const std::vector<std::uint8_t>& body,
-                      std::vector<std::uint8_t>& out) {
+bool encodeSetWifiRequest(std::uint8_t wifi_enable, const std::string& ssid, const std::string& password,
+                          std::vector<std::uint8_t>& out) {
     out.clear();
+    out.push_back(wifi_enable);
+    if (!encodeStringField(ssid, out) || !encodeStringField(password, out)) {
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
+bool decodeSetWifiRequest(const std::uint8_t* data, std::size_t size, std::uint8_t& wifi_enable, std::string& ssid,
+                          std::string& password) {
+    if (size < 1) {
+        return false;
+    }
+    wifi_enable = data[0];
+    std::size_t offset = 1;
+    return decodeStringField(data, size, offset, ssid) && decodeStringField(data, size, offset, password);
+}
+
+bool encodeSetEthStaticRequest(const std::string& eth_ip, std::uint8_t eth_prefix, const std::string& eth_netmask,
+                               const std::string& eth_gateway, const std::string& eth_dns, const std::string& server_ip,
+                               std::vector<std::uint8_t>& out) {
+    out.clear();
+    if (!encodeStringField(eth_ip, out) || !writeU8(out, eth_prefix) || !encodeStringField(eth_netmask, out)
+        || !encodeStringField(eth_gateway, out) || !encodeStringField(eth_dns, out)
+        || !encodeStringField(server_ip, out)) {
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
+bool decodeSetEthStaticRequest(const std::uint8_t* data, std::size_t size, std::string& eth_ip, std::uint8_t& eth_prefix,
+                               std::string& eth_netmask, std::string& eth_gateway, std::string& eth_dns,
+                               std::string& server_ip) {
+    std::size_t offset = 0;
+    return decodeStringField(data, size, offset, eth_ip) && readU8(data, size, offset, eth_prefix)
+        && decodeStringField(data, size, offset, eth_netmask) && decodeStringField(data, size, offset, eth_gateway)
+        && decodeStringField(data, size, offset, eth_dns) && decodeStringField(data, size, offset, server_ip);
+}
+
+bool encodeNetworkConfigData(const NetworkConfigData& data, std::vector<std::uint8_t>& out) {
+    out.clear();
+    writeU32(out, data.command_status);
+    writeU8(out, data.action);
+    writeU8(out, data.wifi_enable);
+    if (!encodeStringField(data.wifi_ssid, out) || !encodeStringField(data.wifi_password, out)
+        || !encodeStringField(data.eth_ip, out) || !writeU8(out, data.eth_prefix)
+        || !encodeStringField(data.eth_netmask, out) || !encodeStringField(data.eth_gateway, out)
+        || !encodeStringField(data.eth_dns, out) || !encodeStringField(data.server_ip, out)) {
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
+bool decodeNetworkConfigData(const std::uint8_t* data, std::size_t size, NetworkConfigData& out) {
+    std::size_t offset = 0;
+    std::uint32_t command_status = 0;
+    if (!readU32(data, size, offset, command_status) || !readU8(data, size, offset, out.action)
+        || !readU8(data, size, offset, out.wifi_enable) || !decodeStringField(data, size, offset, out.wifi_ssid)
+        || !decodeStringField(data, size, offset, out.wifi_password) || !decodeStringField(data, size, offset, out.eth_ip)
+        || !readU8(data, size, offset, out.eth_prefix) || !decodeStringField(data, size, offset, out.eth_netmask)
+        || !decodeStringField(data, size, offset, out.eth_gateway) || !decodeStringField(data, size, offset, out.eth_dns)
+        || !decodeStringField(data, size, offset, out.server_ip)) {
+        return false;
+    }
+    out.command_status = command_status;
+    return true;
+}
+
+bool encodeRpcSessionAuth(const RpcSessionAuth& auth, std::vector<std::uint8_t>& out) {
+    out.clear();
+    writeU16(out, auth.client_id);
+    writeU32(out, auth.session_id);
+    writeU32(out, auth.sequence_id);
+    return out.size() == kRpcSessionAuthSize;
+}
+
+bool decodeRpcSessionAuth(const std::uint8_t* data, std::size_t size, RpcSessionAuth& auth) {
+    if (size < kRpcSessionAuthSize) {
+        return false;
+    }
+    std::size_t offset = 0;
+    return readU16(data, size, offset, auth.client_id)
+        && readU32(data, size, offset, auth.session_id)
+        && readU32(data, size, offset, auth.sequence_id);
+}
+
+bool encodeRpcRequest(const RpcSessionAuth& auth, ServiceId service, std::uint32_t method,
+                      const std::vector<std::uint8_t>& body, std::vector<std::uint8_t>& out) {
+    out.clear();
+    if (!encodeRpcSessionAuth(auth, out)) {
+        return false;
+    }
     writeU32(out, static_cast<std::uint32_t>(service));
     writeU32(out, method);
     out.insert(out.end(), body.begin(), body.end());
     return true;
 }
 
-bool decodeRpcRequest(const std::uint8_t* data, std::size_t size, std::uint32_t& service_id,
+bool decodeRpcRequest(const std::uint8_t* data, std::size_t size, RpcSessionAuth& auth, std::uint32_t& service_id,
                       std::uint32_t& method_id, const std::uint8_t*& body, std::size_t& body_size) {
-    if (size < kRpcHeaderSize) {
+    if (size < kRpcSessionAuthSize + sizeof(RpcRequestHeader)) {
         return false;
     }
     std::size_t offset = 0;
-    if (!readU32(data, size, offset, service_id) || !readU32(data, size, offset, method_id)) {
+    if (!readU16(data, size, offset, auth.client_id)
+        || !readU32(data, size, offset, auth.session_id)
+        || !readU32(data, size, offset, auth.sequence_id)
+        || !readU32(data, size, offset, service_id)
+        || !readU32(data, size, offset, method_id)) {
         return false;
     }
     body = data + offset;
     body_size = size - offset;
     return true;
+}
+
+bool encodeBlobBeginPayload(const RpcSessionAuth& auth, const std::string& name, std::uint32_t total_size,
+                            std::vector<std::uint8_t>& out) {
+    out.clear();
+    if (!encodeRpcSessionAuth(auth, out)) {
+        return false;
+    }
+    if (!encodeStringField(name, out)) {
+        return false;
+    }
+    writeU32(out, total_size);
+    return true;
+}
+
+bool decodeBlobBeginPayload(const std::uint8_t* data, std::size_t size, RpcSessionAuth& auth, std::string& name,
+                            std::uint32_t& total_size) {
+    if (size < kRpcSessionAuthSize) {
+        return false;
+    }
+    std::size_t offset = 0;
+    if (!readU16(data, size, offset, auth.client_id)
+        || !readU32(data, size, offset, auth.session_id)
+        || !readU32(data, size, offset, auth.sequence_id)
+        || !decodeStringField(data, size, offset, name)) {
+        return false;
+    }
+    return readU32(data, size, offset, total_size);
 }
 
 bool encodeRpcResponse(std::uint32_t status_code, const std::vector<std::uint8_t>& body,

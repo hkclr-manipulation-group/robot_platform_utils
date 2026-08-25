@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "tcp_data_protocol.h"
+#include "tcp_data_services.h"
 
 extern "C" {
 #include "curi_tcp/c/src/curi_tcp.h"
@@ -16,11 +17,15 @@ extern "C" {
 namespace robot::platform {
 
 /**
- * TCP data channel server (v2): Ping, blob upload, RPC, blob download.
+ * TCP data channel server (v3): Ping, blob upload, RPC, blob download.
+ * Requires UDP session credentials on authenticated requests (Scheme A).
  * Pair with TcpDataClient on the SDK side. Not used for real-time motion.
  */
 class TcpDataServer {
 public:
+    /** Returns 0 when authorized; otherwise an application auth status (401/403/409). */
+    using SessionAuthValidator = std::function<std::uint32_t(const tcp_data::RpcSessionAuth& auth, std::string& error_message)>;
+
     struct BlobReceipt {
         std::string name;
         std::vector<std::uint8_t> data;
@@ -56,7 +61,8 @@ public:
     bool listen(const std::string& bind_ip, int port = kDefaultPort, int buffer_size = 65536);
 
     /** Block until @p stop_requested becomes true. Handles one client at a time. */
-    void serveForever(DataChannelHandler& handler, const std::function<bool()>& stop_requested);
+    void serveForever(DataChannelHandler& handler, const std::function<bool()>& stop_requested,
+                      SessionAuthValidator auth_validator = {});
 
     void close();
 
@@ -69,7 +75,9 @@ private:
                          const std::vector<std::uint8_t>& body);
     bool sendDownloadStream(std::uint32_t sequence, const std::string& name,
                               const std::vector<std::uint8_t>& data, int timeout_usec);
-    bool handleClient(DataChannelHandler& handler, int timeout_usec);
+    bool handleClient(DataChannelHandler& handler, int timeout_usec, const SessionAuthValidator& auth_validator);
+    std::uint32_t authorizeRequest(const SessionAuthValidator& auth_validator, const tcp_data::RpcSessionAuth& auth,
+                                   std::string& error_message) const;
 
     tcp_node* node_ = nullptr;
     int buffer_size_ = 65536;

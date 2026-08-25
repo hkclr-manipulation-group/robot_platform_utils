@@ -13,6 +13,10 @@ namespace {
 constexpr int kPort = 38990;
 constexpr const char* kHost = "127.0.0.1";
 
+robot::platform::TcpDataServer::SessionAuthValidator permissiveAuthValidator() {
+    return [](const robot::platform::tcp_data::RpcSessionAuth&, std::string&) { return 0u; };
+}
+
 class UploadHandler final : public robot::platform::TcpDataServer::DataChannelHandler {
 public:
     explicit UploadHandler(std::vector<std::uint8_t>& received) : received_(received) {}
@@ -56,7 +60,7 @@ int main() {
             std::exit(1);
         }
 
-        server.serveForever(handler, [&]() { return handler.stop_server_.load(); });
+        server.serveForever(handler, [&]() { return handler.stop_server_.load(); }, permissiveAuthValidator());
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -68,6 +72,9 @@ int main() {
         server_thread.join();
         return 1;
     }
+
+    std::uint32_t seq = 0;
+    client.setSessionCredentials(1, 42, [&]() { return ++seq; });
 
     auto ping = client.ping();
     if (!ping.ok) {

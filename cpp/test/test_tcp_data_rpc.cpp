@@ -16,6 +16,10 @@ namespace {
 constexpr int kPort = 38991;
 constexpr const char* kHost = "127.0.0.1";
 
+robot::platform::TcpDataServer::SessionAuthValidator permissiveAuthValidator() {
+    return [](const robot::platform::tcp_data::RpcSessionAuth&, std::string&) { return 0u; };
+}
+
 class RpcStorageHandler final : public robot::platform::TcpDataServer::DataChannelHandler {
 public:
     explicit RpcStorageHandler(std::string storage_dir) : storage_dir_(std::move(storage_dir)) {}
@@ -139,7 +143,7 @@ int main() {
             std::cerr << "TcpDataServer listen failed\n";
             std::exit(1);
         }
-        server.serveForever(handler, [&]() { return handler.stop_server_.load(); });
+        server.serveForever(handler, [&]() { return handler.stop_server_.load(); }, permissiveAuthValidator());
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -151,6 +155,9 @@ int main() {
         server_thread.join();
         return 1;
     }
+
+    std::uint32_t seq = 0;
+    client.setSessionCredentials(1, 42, [&]() { return ++seq; });
 
     const std::vector<std::uint8_t> payload = {'r', 'p', 'c', '-', 't', 'e', 's', 't'};
     if (auto upload = client.uploadBlob("rpc_demo.teach", payload); !upload.ok) {
