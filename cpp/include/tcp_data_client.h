@@ -85,6 +85,12 @@ public:
     Result pollLogs(std::uint64_t after_id, tcp_data::LogPollResult& result,
                     int timeout_usec = kDefaultTimeoutUsec);
 
+    Result getConfig(tcp_data::RtConfigType type, tcp_data::ConfigValuePayload& result,
+                     int timeout_usec = kDefaultTimeoutUsec);
+
+    Result setConfig(tcp_data::RtConfigType type, const std::vector<std::int32_t>& values,
+                     tcp_data::ConfigValuePayload& result, int timeout_usec = kDefaultTimeoutUsec);
+
     void close();
 
 private:

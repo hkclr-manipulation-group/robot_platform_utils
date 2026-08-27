@@ -22,6 +22,7 @@ enum class ServiceId : std::uint32_t {
     kLog = 3,
     kSystem = 4,
     kNetwork = 5,
+    kConfig = 6,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */
@@ -48,6 +49,28 @@ enum class LogMethod : std::uint32_t {
     kPoll = 1,
 };
 
+enum class ConfigMethod : std::uint32_t {
+    kGet = 1,
+    kSet = 2,
+};
+
+/**
+ * Runtime rt_control parameters exposed via ServiceId::kConfig.
+ * Each type documents its expected value count and semantics.
+ */
+enum class RtConfigType : std::uint32_t {
+    /** values[0]: LogLevel 0=trace .. 5=off */
+    kLogLevel = 1,
+    /** values[0]: 0|1 */
+    kLogToFile = 2,
+    /** values[0]: 0|1 */
+    kLogToStderr = 3,
+    /** values[0]: 0|1 */
+    kTelemetryEnabled = 4,
+    /** values[0]: sample_every_n >= 1 */
+    kTelemetrySampleEveryN = 5,
+};
+
 struct FileEntry {
     std::string name;
     std::uint64_t size = 0;
@@ -62,6 +85,11 @@ struct StatResult {
 struct LogPollResult {
     std::uint64_t latest_id = 0;
     std::vector<std::string> lines;
+};
+
+struct ConfigValuePayload {
+    RtConfigType type = RtConfigType::kLogLevel;
+    std::vector<std::int32_t> values;
 };
 
 /** Network configuration snapshot returned by ServiceId::kNetwork RPCs. */
@@ -115,6 +143,10 @@ bool decodeLogPollRequest(const std::uint8_t* data, std::size_t size, std::uint6
 bool encodeLogPollResponse(std::uint64_t latest_id, const std::vector<std::string>& lines,
                            std::vector<std::uint8_t>& out);
 bool decodeLogPollResponse(const std::uint8_t* data, std::size_t size, LogPollResult& out);
+
+bool encodeConfigValuePayload(RtConfigType type, const std::vector<std::int32_t>& values,
+                              std::vector<std::uint8_t>& out);
+bool decodeConfigValuePayload(const std::uint8_t* data, std::size_t size, ConfigValuePayload& out);
 
 bool encodeRpcSessionAuth(const RpcSessionAuth& auth, std::vector<std::uint8_t>& out);
 bool decodeRpcSessionAuth(const std::uint8_t* data, std::size_t size, RpcSessionAuth& auth);

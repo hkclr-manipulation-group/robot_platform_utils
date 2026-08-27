@@ -624,6 +624,41 @@ TcpDataClient::Result TcpDataClient::pollLogs(std::uint64_t after_id, tcp_data::
     return Result{true, "ok", rpc.status_code, {}};
 }
 
+TcpDataClient::Result TcpDataClient::getConfig(tcp_data::RtConfigType type, tcp_data::ConfigValuePayload& result,
+                                                 int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    if (!tcp_data::encodeConfigValuePayload(type, {}, request_body)) {
+        return Result{false, "TcpDataClient: failed to encode config get request", 0};
+    }
+    Result rpc = callRpc(tcp_data::ServiceId::kConfig, static_cast<std::uint32_t>(tcp_data::ConfigMethod::kGet),
+                         request_body, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeConfigValuePayload(rpc.response_body.data(), rpc.response_body.size(), result)) {
+        return Result{false, "TcpDataClient: failed to decode config get response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::setConfig(tcp_data::RtConfigType type,
+                                               const std::vector<std::int32_t>& values,
+                                               tcp_data::ConfigValuePayload& result, int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    if (!tcp_data::encodeConfigValuePayload(type, values, request_body)) {
+        return Result{false, "TcpDataClient: failed to encode config set request", 0};
+    }
+    Result rpc = callRpc(tcp_data::ServiceId::kConfig, static_cast<std::uint32_t>(tcp_data::ConfigMethod::kSet),
+                         request_body, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeConfigValuePayload(rpc.response_body.data(), rpc.response_body.size(), result)) {
+        return Result{false, "TcpDataClient: failed to decode config set response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
 void TcpDataClient::close() {
     connected_ = false;
     clearSessionCredentials();

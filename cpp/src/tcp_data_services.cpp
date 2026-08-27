@@ -52,6 +52,21 @@ bool writeU64(std::vector<std::uint8_t>& out, std::uint64_t value) {
     return true;
 }
 
+bool writeI32(std::vector<std::uint8_t>& out, std::int32_t value) {
+    const auto* bytes = reinterpret_cast<const std::uint8_t*>(&value);
+    out.insert(out.end(), bytes, bytes + sizeof(value));
+    return true;
+}
+
+bool readI32(const std::uint8_t* data, std::size_t size, std::size_t& offset, std::int32_t& out) {
+    if (offset + sizeof(std::int32_t) > size) {
+        return false;
+    }
+    std::memcpy(&out, data + offset, sizeof(out));
+    offset += sizeof(std::int32_t);
+    return true;
+}
+
 bool writeU8(std::vector<std::uint8_t>& out, std::uint8_t value) {
     out.push_back(value);
     return true;
@@ -203,6 +218,37 @@ bool decodeLogPollResponse(const std::uint8_t* data, std::size_t size, LogPollRe
             return false;
         }
         out.lines.push_back(std::move(line));
+    }
+    return offset == size;
+}
+
+bool encodeConfigValuePayload(RtConfigType type, const std::vector<std::int32_t>& values,
+                              std::vector<std::uint8_t>& out) {
+    out.clear();
+    writeU32(out, static_cast<std::uint32_t>(type));
+    writeU32(out, static_cast<std::uint32_t>(values.size()));
+    for (const std::int32_t value : values) {
+        writeI32(out, value);
+    }
+    return true;
+}
+
+bool decodeConfigValuePayload(const std::uint8_t* data, std::size_t size, ConfigValuePayload& out) {
+    std::size_t offset = 0;
+    std::uint32_t type = 0;
+    std::uint32_t count = 0;
+    if (!readU32(data, size, offset, type) || !readU32(data, size, offset, count)) {
+        return false;
+    }
+    out.type = static_cast<RtConfigType>(type);
+    out.values.clear();
+    out.values.reserve(count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        std::int32_t value = 0;
+        if (!readI32(data, size, offset, value)) {
+            return false;
+        }
+        out.values.push_back(value);
     }
     return offset == size;
 }
