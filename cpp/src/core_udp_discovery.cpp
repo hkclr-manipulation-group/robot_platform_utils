@@ -296,7 +296,8 @@ std::vector<LocalIpv4Network> collectLocalIpv4Networks() {
 }
 
 std::vector<DiscoveryTarget> buildDiscoveryTargets(
-    const std::vector<std::string>& probe_ips) {
+    const std::vector<std::string>& probe_ips,
+    bool expand_local_broadcasts) {
     std::vector<DiscoveryTarget> targets;
     std::unordered_set<std::string> seen;
 
@@ -330,9 +331,11 @@ std::vector<DiscoveryTarget> buildDiscoveryTargets(
         addTarget(probe_ip);
     }
 
-    for (const LocalIpv4Network& net : local_networks) {
-        if (net.broadcast_ip != "255.255.255.255") {
-            addTarget(net.broadcast_ip);
+    if (expand_local_broadcasts) {
+        for (const LocalIpv4Network& net : local_networks) {
+            if (net.broadcast_ip != "255.255.255.255") {
+                addTarget(net.broadcast_ip);
+            }
         }
     }
 
@@ -405,6 +408,21 @@ void sendDiscoveryHandshakeBurst(
     }
 }
 
+bool isProbeResponseAllowed(
+    const std::string& peer_ip,
+    const std::vector<std::string>& probe_ips,
+    bool expand_local_broadcasts) {
+    if (expand_local_broadcasts) {
+        return true;
+    }
+    for (const std::string& probe_ip : probe_ips) {
+        if (peer_ip == probe_ip) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 DiscoveredServer discoverRtServerViaHandshake(
@@ -414,7 +432,8 @@ DiscoveredServer discoverRtServerViaHandshake(
     int local_ack_port,
     const std::vector<std::string>& probe_ips,
     float timeout_ms,
-    int max_attempts_per_probe) {
+    int max_attempts_per_probe,
+    bool expand_local_broadcasts) {
     if (probe_ips.empty()) {
         throw std::invalid_argument("discoverRtServerViaHandshake: probe_ips is empty");
     }
@@ -428,7 +447,8 @@ DiscoveredServer discoverRtServerViaHandshake(
         max_attempts_per_probe = 1;
     }
 
-    const std::vector<DiscoveryTarget> targets = buildDiscoveryTargets(probe_ips);
+    const std::vector<DiscoveryTarget> targets =
+        buildDiscoveryTargets(probe_ips, expand_local_broadcasts);
     if (targets.empty()) {
         throw std::invalid_argument("discoverRtServerViaHandshake: no discovery targets");
     }
@@ -527,6 +547,11 @@ DiscoveredServer discoverRtServerViaHandshake(
 
         DiscoveredServer out;
         out.server_ip = sockaddrToIp(peer);
+        if (!isProbeResponseAllowed(out.server_ip, probe_ips, expand_local_broadcasts)) {
+            std::cout << "discoverRtServerViaHandshake: ignoring response from "
+                      << out.server_ip << " (not in probe list)\n";
+            continue;
+        }
         fillDiscoveredServerFromHandshake(
             out, res, handshake.sequence_id, sanitizeTimeSyncOffset(sync.offset_us), sync.rtt_us);
         if (isMulticastIp(out.server_ip) || isLimitedBroadcast(out.server_ip)) {
@@ -565,7 +590,7 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
         max_attempts_per_probe = 1;
     }
 
-    const std::vector<DiscoveryTarget> targets = buildDiscoveryTargets(probe_ips);
+    const std::vector<DiscoveryTarget> targets = buildDiscoveryTargets(probe_ips, true);
     if (targets.empty()) {
         return {};
     }

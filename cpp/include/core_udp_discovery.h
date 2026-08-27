@@ -42,7 +42,8 @@ DiscoveredServer discoverRtServerViaHandshake(
     int local_ack_port,
     const std::vector<std::string>& probe_ips,
     float timeout_ms = 1500.0f,
-    int max_attempts_per_probe = 2);
+    int max_attempts_per_probe = 2,
+    bool expand_local_broadcasts = true);
 
 /** Convenience overload for a single probe address. */
 inline DiscoveredServer discoverRtServerViaHandshake(
@@ -52,10 +53,12 @@ inline DiscoveredServer discoverRtServerViaHandshake(
     int local_ack_port,
     const std::string& probe_ip,
     float timeout_ms = 1500.0f,
-    int max_attempts_per_probe = 2) {
+    int max_attempts_per_probe = 2,
+    bool expand_local_broadcasts = true) {
     return discoverRtServerViaHandshake(
         client_id, core_request_port, telemetry_port, local_ack_port,
-        std::vector<std::string>{probe_ip}, timeout_ms, max_attempts_per_probe);
+        std::vector<std::string>{probe_ip}, timeout_ms, max_attempts_per_probe,
+        expand_local_broadcasts);
 }
 
 /**
