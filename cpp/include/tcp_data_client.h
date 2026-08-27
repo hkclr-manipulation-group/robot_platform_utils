@@ -82,6 +82,9 @@ public:
     Result callNetworkConfig(tcp_data::NetworkMethod method, const std::vector<std::uint8_t>& request_body,
                              tcp_data::NetworkConfigData& response, int timeout_usec = kDefaultTimeoutUsec);
 
+    Result pollLogs(std::uint64_t after_id, tcp_data::LogPollResult& result,
+                    int timeout_usec = kDefaultTimeoutUsec);
+
     void close();
 
 private:

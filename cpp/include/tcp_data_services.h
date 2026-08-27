@@ -44,6 +44,10 @@ enum class SystemMethod : std::uint32_t {
     kGetVersion = 2,
 };
 
+enum class LogMethod : std::uint32_t {
+    kPoll = 1,
+};
+
 struct FileEntry {
     std::string name;
     std::uint64_t size = 0;
@@ -53,6 +57,11 @@ struct FileEntry {
 struct StatResult {
     std::uint64_t size = 0;
     std::uint64_t mtime_sec = 0;
+};
+
+struct LogPollResult {
+    std::uint64_t latest_id = 0;
+    std::vector<std::string> lines;
 };
 
 /** Network configuration snapshot returned by ServiceId::kNetwork RPCs. */
@@ -99,6 +108,13 @@ bool decodeStatResult(const std::uint8_t* data, std::size_t size, StatResult& st
 
 bool encodeDownloadMeta(std::uint64_t size, std::vector<std::uint8_t>& out);
 bool decodeDownloadMeta(const std::uint8_t* data, std::size_t size, std::uint64_t& size_out);
+
+bool encodeLogPollRequest(std::uint64_t after_id, std::vector<std::uint8_t>& out);
+bool decodeLogPollRequest(const std::uint8_t* data, std::size_t size, std::uint64_t& after_id);
+
+bool encodeLogPollResponse(std::uint64_t latest_id, const std::vector<std::string>& lines,
+                           std::vector<std::uint8_t>& out);
+bool decodeLogPollResponse(const std::uint8_t* data, std::size_t size, LogPollResult& out);
 
 bool encodeRpcSessionAuth(const RpcSessionAuth& auth, std::vector<std::uint8_t>& out);
 bool decodeRpcSessionAuth(const std::uint8_t* data, std::size_t size, RpcSessionAuth& auth);

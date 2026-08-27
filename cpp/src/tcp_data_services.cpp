@@ -164,6 +164,49 @@ bool decodeDownloadMeta(const std::uint8_t* data, std::size_t size, std::uint64_
     return readU64(data, size, offset, size_out);
 }
 
+bool encodeLogPollRequest(std::uint64_t after_id, std::vector<std::uint8_t>& out) {
+    out.clear();
+    writeU64(out, after_id);
+    return true;
+}
+
+bool decodeLogPollRequest(const std::uint8_t* data, std::size_t size, std::uint64_t& after_id) {
+    std::size_t offset = 0;
+    return readU64(data, size, offset, after_id);
+}
+
+bool encodeLogPollResponse(std::uint64_t latest_id, const std::vector<std::string>& lines,
+                           std::vector<std::uint8_t>& out) {
+    out.clear();
+    writeU64(out, latest_id);
+    writeU32(out, static_cast<std::uint32_t>(lines.size()));
+    for (const auto& line : lines) {
+        if (!encodeStringField(line, out)) {
+            out.clear();
+            return false;
+        }
+    }
+    return true;
+}
+
+bool decodeLogPollResponse(const std::uint8_t* data, std::size_t size, LogPollResult& out) {
+    std::size_t offset = 0;
+    std::uint32_t count = 0;
+    if (!readU64(data, size, offset, out.latest_id) || !readU32(data, size, offset, count)) {
+        return false;
+    }
+    out.lines.clear();
+    out.lines.reserve(count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        std::string line;
+        if (!decodeStringField(data, size, offset, line)) {
+            return false;
+        }
+        out.lines.push_back(std::move(line));
+    }
+    return offset == size;
+}
+
 bool encodeSetWifiRequest(std::uint8_t wifi_enable, const std::string& ssid, const std::string& password,
                           std::vector<std::uint8_t>& out) {
     out.clear();

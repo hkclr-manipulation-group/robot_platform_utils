@@ -607,6 +607,23 @@ TcpDataClient::Result TcpDataClient::callNetworkConfig(tcp_data::NetworkMethod m
     return Result{true, "ok", rpc.status_code, {}};
 }
 
+TcpDataClient::Result TcpDataClient::pollLogs(std::uint64_t after_id, tcp_data::LogPollResult& result,
+                                              int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    if (!tcp_data::encodeLogPollRequest(after_id, request_body)) {
+        return Result{false, "TcpDataClient: failed to encode log poll request", 0};
+    }
+    Result rpc = callRpc(tcp_data::ServiceId::kLog, static_cast<std::uint32_t>(tcp_data::LogMethod::kPoll),
+                         request_body, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeLogPollResponse(rpc.response_body.data(), rpc.response_body.size(), result)) {
+        return Result{false, "TcpDataClient: failed to decode log poll response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
 void TcpDataClient::close() {
     connected_ = false;
     clearSessionCredentials();
