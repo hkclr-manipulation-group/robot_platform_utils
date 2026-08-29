@@ -76,6 +76,18 @@ namespace robot::platform {
             std::cout << "]\n";
         }
 
+        template <std::size_t N>
+        void printJogCommand(const std::string& label, const JogCommand(&commands)[N]) {
+            std::cout << "  " << label << ": [";
+            for (std::size_t i = 0; i < N; ++i) {
+                if (i > 0) {
+                    std::cout << ", ";
+                }
+                std::cout << static_cast<int>(commands[i]);
+            }
+            std::cout << "]\n";
+        }
+
         void printCartesianTarget(const std::string& label, const CartesianTarget& target) {
             std::cout << "  " << label << ": "
                     << "{x: " << target.x
@@ -110,6 +122,11 @@ namespace robot::platform {
         std::cout << "  payload.gripper_size: " << static_cast<int>(value.payload.gripper_size) << "\n";
         printByteArray("payload.arm_joint_size", value.payload.arm_joint_size, value.payload.arm_size);
         printByteArray("payload.gripper_joint_size", value.payload.gripper_joint_size, value.payload.gripper_size);
+        for (std::size_t i = 0; i < value.payload.arm_size; ++i) {
+            std::cout << "  payload.activated_control_strategy[" << i << "]: " << enumToString(value.payload.activated_control_strategy[i]) << "\n";
+        }
+        std::cout << "  payload.teaching_cmd: " << enumToString(value.payload.teaching_cmd) << "\n";
+        std::cout << "  payload.enable_jog: " << static_cast<int>(value.payload.enable_jog) << "\n";
         std::cout << "  payload.target_count: " << static_cast<int>(value.payload.target_count) << "\n";
 
         const std::size_t target_count = safeBound(value.payload.target_count, MAX_WAYPOINTS);
@@ -119,13 +136,21 @@ namespace robot::platform {
             std::cout << "    interpolation_t: " << target.interpolation_t << "\n";
             std::cout << "    interpolation_speed_ratio: " << target.interpolation_speed_ratio << "\n";
             for (std::size_t j = 0; j < value.payload.arm_size; ++j) {
-                std::string label = "arm_joint[" + std::to_string(j) + "]";
-                printFloatArray(label, target.arm_joint[j], MAX_ARM_JOINT_SIZE);
+                if (value.payload.activated_control_strategy[j] == ControlStrategy::kJoint && !value.payload.enable_jog) {
+                    std::string label = "arm_joint[" + std::to_string(j) + "]";
+                    printFloatArray(label, target.arm_joint[j], MAX_ARM_JOINT_SIZE);
+                } else if (value.payload.activated_control_strategy[j] != ControlStrategy::kJoint && !value.payload.enable_jog) {
+                    std::string label = "arm_tool_cartesian[" + std::to_string(j) + "]";
+                    printCartesianTarget(label, target.arm_tool_cartesian[j]);
+                }else if (value.payload.activated_control_strategy[j] == ControlStrategy::kJoint && value.payload.enable_jog) {
+                    std::string label = "arm_joint_jog[" + std::to_string(j) + "]";
+                    printJogCommand(label, target.arm_joint_jog[j]);
+                } else if (value.payload.activated_control_strategy[j] != ControlStrategy::kJoint && value.payload.enable_jog) {
+                    std::string label = "arm_cartesian_jog[" + std::to_string(j) + "]";
+                    printJogCommand(label, target.arm_cartesian_jog[j]);
+                }
             }
-            for (std::size_t j = 0; j < value.payload.arm_size; ++j) {
-                std::string label = "arm_tool_cartesian[" + std::to_string(j) + "]";
-                printCartesianTarget(label, target.arm_tool_cartesian[j]);
-            }
+
             for (std::size_t j = 0; j < value.payload.gripper_size; ++j) {
                 std::string label = "gripper_joint[" + std::to_string(j) + "]";
                 printFloatArray(label, target.gripper_joint[j], MAX_GRIPPER_JOINT_SIZE);
@@ -168,8 +193,8 @@ namespace robot::platform {
             std::cout << "    filter_type: " << enumToString(arm.filter_type) << "\n";
             std::cout << "    target_type: " << enumToString(arm.target_type) << "\n";
             std::cout << "    actuator_mode: " << enumToString(arm.actuator_mode) << "\n";
-            std::cout << "    playback_cmd: " << enumToString(arm.playback_cmd) << "\n";
-            std::cout << "    frame_reference: " << enumToString(arm.frame_reference) << "\n";
+            std::cout << "    cartesian_jog_trans_frame: " << enumToString(arm.cartesian_jog_trans_frame) << "\n";
+            std::cout << "    cartesian_jog_rot_frame: " << enumToString(arm.cartesian_jog_rot_frame) << "\n";
             std::cout << "    reset_control_mem: " << static_cast<int>(arm.reset_control_mem) << "\n";
             std::cout << "    reset_interpolation: " << static_cast<int>(arm.reset_interpolation) << "\n";
             printByteArray("enable_joint", arm.enable_joint, joint_size);
@@ -215,7 +240,8 @@ namespace robot::platform {
             std::cout << "    filter_type: " << enumToString(arm.filter_type) << "\n";
             std::cout << "    target_type: " << enumToString(arm.target_type) << "\n";
             std::cout << "    actuator_mode: " << enumToString(arm.actuator_mode) << "\n";
-            std::cout << "    frame_reference: " << enumToString(arm.frame_reference) << "\n";
+            std::cout << "    cartesian_jog_trans_frame: " << enumToString(arm.cartesian_jog_trans_frame) << "\n";
+            std::cout << "    cartesian_jog_rot_frame: " << enumToString(arm.cartesian_jog_rot_frame) << "\n";
             printPositionTarget("tool_offset", arm.tool_offset);
             printByteArray("enabled_joint", arm.enabled_joint, joint_size);
             printFloatArray2D("soft_limit_position", arm.soft_limit_position, joint_size);
@@ -339,7 +365,7 @@ namespace robot::platform {
         std::cout << "  payload.system_state: " << enumToString(value.payload.system_state) << "\n";
         std::cout << "  payload.plan_result: " << enumToString(value.payload.plan_result) << "\n";
         std::cout << "  payload.system_diagnostic_flags: \n";
-        print_diagnostic_flags(value.payload.system_diagnostic_flags);
+        printDiagnosticFlags(value.payload.system_diagnostic_flags);
         std::cout << "  payload.session_id: " << value.payload.session_id << "\n";
         std::cout << "  payload.last_processed_seq: " << value.payload.last_processed_seq << "\n";
 
@@ -359,7 +385,7 @@ namespace robot::platform {
             printFloatArray("last_set_command", arm.last_set_command, joint_size);
             for (std::size_t joint_idx = 0; joint_idx < static_cast<std::size_t>(joint_size); ++joint_idx) {
                 std::cout << "diagnostic_flags[" << joint_idx << "]: ";
-                print_diagnostic_flags(arm.diagnostic_flags[joint_idx]);
+                printDiagnosticFlags(arm.diagnostic_flags[joint_idx]);
             }
         }
 
@@ -372,170 +398,184 @@ namespace robot::platform {
             printFloatArray("last_set_command", gripper.last_set_command, joint_size);
             for (std::size_t joint_idx = 0; joint_idx < static_cast<std::size_t>(joint_size); ++joint_idx) {
                 std::cout << "diagnostic_flags[" << joint_idx << "]: ";
-                print_diagnostic_flags(gripper.diagnostic_flags[joint_idx]);
+                printDiagnosticFlags(gripper.diagnostic_flags[joint_idx]);
             }
         }
     }
 
-    void print_diagnostic_flags(uint64_t flags){
+    std::vector<std::string> diagnosticFlagsToString(uint64_t flags){
+        std::vector<std::string> result;
         if (flags == DiagnosticFlags::kNone){
-            printf("None\n");
-            return;
+            result.push_back("None");
+            return result;
         }
+
         if (flags & DiagnosticFlags::kTargetPosSaturation){
-            printf("TargetPosSaturation: position target is saturated\n");
+            result.push_back("TargetPosSaturation: position target is saturated");
         }
         if (flags & DiagnosticFlags::kTargetVelSaturation){
-            printf("TargetVelSaturation: velocity target is saturated\n");
+            result.push_back("TargetVelSaturation: velocity target is saturated");
         }
         if (flags & DiagnosticFlags::kTargetTorSaturation){
-            printf("TargetTorSaturation: torque target is saturated\n");
+            result.push_back("TargetTorSaturation: torque target is saturated");
         }
         if (flags & DiagnosticFlags::kTargetPosOutOfRange){
-            printf("TargetPosOutOfRange: User position target out of range\n");
+            result.push_back("TargetPosOutOfRange: User position target out of range");
         }
         if (flags & DiagnosticFlags::kTargetVelOutOfRange){
-            printf("TargetVelOutOfRange: User velocity target out of range\n");
+            result.push_back("TargetVelOutOfRange: User velocity target out of range");
         }
         if (flags & DiagnosticFlags::kTargetTorOutOfRange){
-            printf("TargetTorOutOfRange: User torque target out of range\n");
+            result.push_back("TargetTorOutOfRange: User torque target out of range");
         }
         if (flags & DiagnosticFlags::kActuatorPosSaturation){
-            printf("ActuatorPosSaturation: Actuator command clamped by soft position limits\n");
+            result.push_back("ActuatorPosSaturation: Actuator command clamped by soft position limits");
         }
         if (flags & DiagnosticFlags::kActuatorVelSaturation){
-            printf("ActuatorVelSaturation: Actuator command clamped by soft velocity limits\n");
+            result.push_back("ActuatorVelSaturation: Actuator command clamped by soft velocity limits");
         }
         if (flags & DiagnosticFlags::kActuatorTorSaturation){
-            printf("ActuatorTorSaturation: Actuator command clamped by soft torque limits\n");
+            result.push_back("ActuatorTorSaturation: Actuator command clamped by soft torque limits");
         }
         if (flags & DiagnosticFlags::kActuatorPosJumpSaturation){
-            printf("ActuatorPosJumpSaturation: Actuator command clamped by position jump limit\n");
+            result.push_back("ActuatorPosJumpSaturation: Actuator command clamped by position jump limit");
         }
         if (flags & DiagnosticFlags::kActuatorVelJumpSaturation){
-            printf("ActuatorVelJumpSaturation: Actuator command clamped by velocity jump limit\n");
+            result.push_back("ActuatorVelJumpSaturation: Actuator command clamped by velocity jump limit");
         }
         if (flags & DiagnosticFlags::kActuatorTorJumpSaturation){
-            printf("ActuatorTorJumpSaturation: Actuator command clamped by torque jump limit\n");
+            result.push_back("ActuatorTorJumpSaturation: Actuator command clamped by torque jump limit");
         }
         if (flags & DiagnosticFlags::kBoundaryVelClamp){
-            printf("BoundaryVelClamp: Velocity zeroed in limit direction due to position boundary reached\n");
+            result.push_back("BoundaryVelClamp: Velocity zeroed in limit direction due to position boundary reached");
         }
         if (flags & DiagnosticFlags::kBoundaryJointImpedance){
-            printf("BoundaryJointImpedance: Joint impedance applied due to position boundary reached\n");
+            result.push_back("BoundaryJointImpedance: Joint impedance applied due to position boundary reached");
         }
 
         // --- Algorithmic & Kinematic Planner Modifications ---
         if (flags & DiagnosticFlags::kPlanTimelineExtended){
-            printf("PlanTimelineExtended: Trajectory segment duration (dt) stretched for velocity limits\n");
+            result.push_back("PlanTimelineExtended: Trajectory segment duration (dt) stretched for velocity limits");
         }
         if (flags & DiagnosticFlags::kPlanVelLimitInvalid){
-            printf("PlanVelLimitInvalid: Specified max velocity profile is below tolerance(1e-4)\n");
+            result.push_back("PlanVelLimitInvalid: Specified max velocity profile is below tolerance(1e-4)");
         }
         if (flags & DiagnosticFlags::kPlanDeltaTooLarge){
-            printf("PlanDeltaTooLarge: Distance between points requires unachievable time scaling\n");
+            result.push_back("PlanDeltaTooLarge: Distance between points requires unachievable time scaling");
         }
         if (flags & DiagnosticFlags::kPlanVelocitySnap){
-            printf("PlanVelocitySnap: Large velocity shift over zero distance\n");
+            result.push_back("PlanVelocitySnap: Large velocity shift over zero distance");
         }
         if (flags & DiagnosticFlags::kPlanPointSkipped){
-            printf("PlanPointSkipped: Duplicated points skipped\n");
+            result.push_back("PlanPointSkipped: Duplicated points skipped");
         }
 
         // --- Fault Flags ---
         if (flags & DiagnosticFlags::kFaultPosHardLimitReached){
-            printf("FaultPosHardLimitReached: Position hard limit reached\n");
+            result.push_back("FaultPosHardLimitReached: Position hard limit reached");
         }
         if (flags & DiagnosticFlags::kFaultVelHardLimitReached){
-            printf("FaultVelHardLimitReached: Velocity hard limit reached\n");
+            result.push_back("FaultVelHardLimitReached: Velocity hard limit reached");
         }
         if (flags & DiagnosticFlags::kFaultTorHardLimitReached){
-            printf("FaultTorHardLimitReached: Torque hard limit reached\n");
+            result.push_back("FaultTorHardLimitReached: Torque hard limit reached");
         }
         if (flags & DiagnosticFlags::kFaultPosTrackingFailed){
-            printf("FaultPosTrackingFailed: Position tracking failed\n");
+            result.push_back("FaultPosTrackingFailed: Position tracking failed");
         }
         if (flags & DiagnosticFlags::kFaultVelTrackingFailed){
-            printf("FaultVelTrackingFailed: Velocity tracking failed\n");
+            result.push_back("FaultVelTrackingFailed: Velocity tracking failed");
         }
         if (flags & DiagnosticFlags::kFaultTorTrackingFailed){
-            printf("FaultTorTrackingFailed: Torque tracking failed\n");
+            result.push_back("FaultTorTrackingFailed: Torque tracking failed");
         }
         if (flags & DiagnosticFlags::kFaultArmNotFound){
-            printf("FaultArmNotFound: Arm not found\n");
+            result.push_back("FaultArmNotFound: Arm not found");
         }
         if (flags & DiagnosticFlags::kFaultGripperNotFound){
-            printf("FaultGripperNotFound: Gripper not found\n");
+            result.push_back("FaultGripperNotFound: Gripper not found");
         }
         if (flags & DiagnosticFlags::kFaultButtonNotFound){
-            printf("kFaultButtonNotFound: Button not found\n");
+            result.push_back("kFaultButtonNotFound: Button not found");
         }
         if (flags & DiagnosticFlags::kFaultArmInitFailed){
-            printf("kFaultArmInitFailed: Arm Hardware initialization failed\n");
+            result.push_back("kFaultArmInitFailed: Arm Hardware initialization failed");
         }
         if (flags & DiagnosticFlags::kFaultGripperInitFailed){
-            printf("kFaultGripperInitFailed: Gripper Hardware initialization failed\n");
+            result.push_back("kFaultGripperInitFailed: Gripper Hardware initialization failed");
         }
         if (flags & DiagnosticFlags::kFaultButtonInitFailed){
-            printf("kFaultButtonInitFailed: Button Hardware initialization failed\n");
+            result.push_back("kFaultButtonInitFailed: Button Hardware initialization failed");
         }
         if (flags & DiagnosticFlags::kFaultHardwareEnableFailed){
-            printf("kFaultHardwareEnableFailed: Hardware failed to enable\n");
+            result.push_back("kFaultHardwareEnableFailed: Hardware failed to enable");
         }
         if (flags & DiagnosticFlags::kFaultHardwareChangeModeFailed){
-            printf("kFaultHardwareChangeModeFailed: Hardware failed to change mode\n");
+            result.push_back("kFaultHardwareChangeModeFailed: Hardware failed to change mode");
         }
         if (flags & DiagnosticFlags::kFaultHardwareSetReadFailed){
-            printf("kFaultHardwareSetReadFailed: Hardware failed to Set or Read\n");
+            result.push_back("kFaultHardwareSetReadFailed: Hardware failed to Set or Read");
         }
 
         if (flags & DiagnosticFlags::kFaultArmSizeMismatch){
-            printf("FaultArmSizeMismatch: SDK arm count does not match server configuration\n");
+            result.push_back("FaultArmSizeMismatch: SDK arm count does not match server configuration");
         }
         if (flags & DiagnosticFlags::kFaultGripperSizeMismatch){
-            printf("FaultGripperSizeMismatch: SDK gripper count does not match server configuration\n");
+            result.push_back("FaultGripperSizeMismatch: SDK gripper count does not match server configuration");
         }
         if (flags & DiagnosticFlags::kFaultArmJointSizeMismatch){
-            printf("FaultArmJointSizeMismatch: SDK arm joint count does not match server configuration\n");
+            result.push_back("FaultArmJointSizeMismatch: SDK arm joint count does not match server configuration");
         }
         if (flags & DiagnosticFlags::kFaultGripperJointSizeMismatch){
-            printf("FaultGripperJointSizeMismatch: SDK gripper joint count does not match server configuration\n");
+            result.push_back("FaultGripperJointSizeMismatch: SDK gripper joint count does not match server configuration");
         }
         if (flags & DiagnosticFlags::kFaultRobotNameMismatch){
-            printf("FaultRobotNameMismatch: SDK robot name does not match server configuration\n");
+            result.push_back("FaultRobotNameMismatch: SDK robot name does not match server configuration");
         }
+        if (flags & DiagnosticFlags::kFaultArmControlStrategyMismatch){
+            result.push_back("FaultArmControlStrategyMismatch: SDK arm activated control strategy does not match server configuration");
+        }
+
         if (flags & DiagnosticFlags::kFaultCollisionDetected){
-            printf("FaultCollisionDetected: Collision detected\n");
+            result.push_back("FaultCollisionDetected: Collision detected");
         }
         if (flags & DiagnosticFlags::kFaultRecoveryRequired){
-            printf("FaultRecoveryRequired: Recovery required\n");
+            result.push_back("FaultRecoveryRequired: Recovery required");
         }
         if (flags & DiagnosticFlags::kInvalidControlTypeCombination){
-            printf("InvalidControlTypeCombination: Control type combination is invalid or not supported\n");
+            result.push_back("InvalidControlTypeCombination: Control type combination is invalid or not supported");
         }
         if (flags & DiagnosticFlags::kCartesianControlRequirePositionTarget){
-            printf("CartesianControlRequirePositionTarget: Cartesian control require position target\n");
+            result.push_back("CartesianControlRequirePositionTarget: Cartesian control require position target");
         }
         if (flags & DiagnosticFlags::kControlStrategyNotAvailable){
-            printf("ControlStrategyNotAvailable: Control strategy is not available\n");
+            result.push_back("ControlStrategyNotAvailable: Control strategy is not available");
         }
         if (flags & DiagnosticFlags::kWaypointControlStrategyNotAllowed){
-            printf("WaypointControlStrategyNotAllowed: Control strategy is not allowed for waypoint\n");
+            result.push_back("WaypointControlStrategyNotAllowed: Control strategy is not allowed for waypoint");
         }
         if (flags & DiagnosticFlags::kWaypointSmoothingMethodNotAllowed){
-            printf("WaypointSmoothingMethodNotAllowed: Smoothing method is not allowed for waypoint\n");
+            result.push_back("WaypointSmoothingMethodNotAllowed: Smoothing method is not allowed for waypoint");
         }
         if (flags & DiagnosticFlags::kWaypointTargetTypeNotAllowed){
-            printf("WaypointTargetTypeNotAllowed: Target type is not allowed for waypoint\n");
+            result.push_back("WaypointTargetTypeNotAllowed: Target type is not allowed for waypoint");
         }
-        if (flags & DiagnosticFlags::kPlaybackControlRequirePositionTarget){
-            printf("PlaybackControlRequirePositionTarget: Playback control require position target\n");
+        if (flags & DiagnosticFlags::kTeachingReplayControlRequirePositionTarget){
+            result.push_back("TeachingReplayControlRequirePositionTarget: Teaching replay control require position target");
         }
-        if (flags & DiagnosticFlags::kPlaybackControlStartPoseNotReachable){
-            printf("PlaybackControlStartPoseNotReachable: Playback control start pose not reachable\n");
+        if (flags & DiagnosticFlags::kTeachingReplayControlStartPoseNotReachable){
+            result.push_back("TeachingReplayControlStartPoseNotReachable: Teaching replay control start pose not reachable");
         }
         if (flags & DiagnosticFlags::kUnknown){
-            printf("FaultUnknown: Unknown fault\n");
+            result.push_back("FaultUnknown: Unknown fault");
+        }
+        return result;
+    }
+
+    void printDiagnosticFlags(uint64_t flags){
+        std::vector<std::string> flags_strings = diagnosticFlagsToString(flags);
+        for (const auto& flag : flags_strings){
+            printf("%s\n", flag.c_str());
         }
     }
     
@@ -632,6 +672,8 @@ namespace robot::platform {
         req.sequence_id = sequence_id;
         req.timestamp_us = get_time_now();
         req.payload.target_count = 0;
+        req.payload.enable_jog = 0;
+        req.payload.teaching_cmd = TeachingCommand::kNone;
         return req;
     }
     
@@ -658,7 +700,8 @@ namespace robot::platform {
             request.payload.arm[arm_i].filter_type = response.payload.arm[arm_i].filter_type;
             request.payload.arm[arm_i].target_type = response.payload.arm[arm_i].target_type;
             request.payload.arm[arm_i].actuator_mode = response.payload.arm[arm_i].actuator_mode;
-            request.payload.arm[arm_i].frame_reference = response.payload.arm[arm_i].frame_reference;
+            request.payload.arm[arm_i].cartesian_jog_trans_frame = response.payload.arm[arm_i].cartesian_jog_trans_frame;
+            request.payload.arm[arm_i].cartesian_jog_rot_frame = response.payload.arm[arm_i].cartesian_jog_rot_frame;
             request.payload.arm[arm_i].tool_offset = response.payload.arm[arm_i].tool_offset;
 
             for (int joint_i = 0; joint_i < response.payload.arm_joint_size[arm_i]; ++joint_i){

@@ -32,8 +32,7 @@ namespace robot::platform {
         kCartesianLine, 
         kNullspace, 
         kGravityCompensation,
-        kRecord,
-        kPlayback,
+        kTeachingReplay,
     };
 
     enum class FrameReference: uint8_t { kTool, kBase };
@@ -72,7 +71,22 @@ namespace robot::platform {
         kDeviateAndBypassing = 2, // Deviate from the line (e.g., switch to joint space) to bypass the unreachable zone.
         kSegmentedExecution = 3 // Execute valid parts, skip the bad segment, and resume line tracking later.
     };
-    enum class PlaybackState: uint8_t{kStop, kStart, kReset};
+    
+    /**
+    * @brief State Machine Constraints for Robot Teaching Features
+    * 
+    * 1. Idle/Default State (`kNone`):
+    *    - Constraint: None. Safe to call in any ControlStrategy.
+    *    - Note: Performs the same safe-stop operation as `kStopRecord` and `kStopReplay`.
+    * 
+    * 2. Recording Commands (`kStartRecord`, `kStopRecord`):
+    *    - Constraint: Requires `ControlStrategy != ControlStrategy::kTeachingReplay`
+    * 
+    * 3. Replay Commands (`kStartReplay`, `kStopReplay`, `kResetReplay`):
+    *    - Constraint: Requires `ControlStrategy == ControlStrategy::kTeachingReplay`
+    *    - Note: Silently ignored if received under any non-replay ControlStrategy.
+    */
+    enum class TeachingCommand: uint8_t{kNone, kStartRecord, kStopRecord, kStartReplay, kStopReplay, kResetReplay};
 
     /** Per-axis jog request when SdkCommandReq.payload.enable_jog is set. */
     enum class JogCommand: uint8_t {
@@ -82,9 +96,10 @@ namespace robot::platform {
     };
     
     enum class PlanResult : uint8_t {
-        kSuccess                    = 0,  // IK passed, time allocation valid, safe to execute
-        kPoseNotReachable           = 1,  // Target 6D pose is physically outside the workspace
-        kLinearPathFailed           = 2,  // Reachable target, but continuous linear path is blocked (Singularity / Joint Limit)
+        kNone                       = 0, //No applicable
+        kSuccess                    = 1,  // IK passed, time allocation valid, safe to execute
+        kPoseNotReachable           = 2,  // Target 6D pose is physically outside the workspace
+        kLinearPathFailed           = 3,  // Reachable target, but continuous linear path is blocked (Singularity / Joint Limit)
     };
 
     enum class SystemState : uint8_t {
@@ -153,19 +168,20 @@ namespace robot::platform {
         constexpr uint64_t kFaultArmJointSizeMismatch       = 1ULL << 37;
         constexpr uint64_t kFaultGripperJointSizeMismatch   = 1ULL << 38;
         constexpr uint64_t kFaultRobotNameMismatch          = 1ULL << 39;
+        constexpr uint64_t kFaultArmControlStrategyMismatch = 1ULL << 40;
 
-        constexpr uint64_t kFaultCollisionDetected          = 1ULL << 40; // Collision detected and goes into fault mode
-        constexpr uint64_t kFaultRecoveryRequired           = 1ULL << 41; // Recovery required
+        constexpr uint64_t kFaultCollisionDetected          = 1ULL << 41;
+        constexpr uint64_t kFaultRecoveryRequired           = 1ULL << 42;
 
         // --- Configuration Validation ---
-        constexpr uint64_t kInvalidControlTypeCombination         = 1ULL << 42; // Control type combination is invalid or not supported
-        constexpr uint64_t kCartesianControlRequirePositionTarget = 1ULL << 43; // Cartesian control require position target
-        constexpr uint64_t kControlStrategyNotAvailable           = 1ULL << 44; // Control strategy is not available
-        constexpr uint64_t kWaypointControlStrategyNotAllowed     = 1ULL << 45; // Waypoint control strategy is invalid
-        constexpr uint64_t kWaypointTargetTypeNotAllowed          = 1ULL << 46; // Waypoint target type is invalid
-        constexpr uint64_t kWaypointSmoothingMethodNotAllowed     = 1ULL << 47; // Waypoint smoothing method is invalid
-        constexpr uint64_t kPlaybackControlRequirePositionTarget  = 1ULL << 48; // Playback control require position target
-        constexpr uint64_t kPlaybackControlStartPoseNotReachable  = 1ULL << 49; // Playback control cannot reach start pose
+        constexpr uint64_t kInvalidControlTypeCombination         = 1ULL << 43; // Control type combination is invalid or not supported
+        constexpr uint64_t kCartesianControlRequirePositionTarget = 1ULL << 44; // Cartesian control require position target
+        constexpr uint64_t kControlStrategyNotAvailable           = 1ULL << 45; // Control strategy is not available
+        constexpr uint64_t kWaypointControlStrategyNotAllowed     = 1ULL << 46; // Waypoint control strategy is invalid
+        constexpr uint64_t kWaypointTargetTypeNotAllowed          = 1ULL << 47; // Waypoint target type is invalid
+        constexpr uint64_t kWaypointSmoothingMethodNotAllowed     = 1ULL << 48; // Waypoint smoothing method is invalid
+        constexpr uint64_t kTeachingReplayControlRequirePositionTarget  = 1ULL << 49; // Teaching replay control require position target
+        constexpr uint64_t kTeachingReplayControlStartPoseNotReachable  = 1ULL << 50; // Teaching replay control cannot reach start pose
 
         constexpr uint64_t kUnknown                               = 1ULL << 63;
     };
@@ -252,21 +268,32 @@ namespace robot::platform {
 
     struct CartesianTarget {
         float x, y, z;
-        float qw, qx, qy, qz;
+        float qw, qx, qy, qz; //Quaternion
     };
 
     struct SinglePointTarget{
-        float               interpolation_t;
-        float               interpolation_speed_ratio;
+        float               interpolation_t; // Minimum interpolation time, t >= 0. May be extended based on interpolation_speed_ratio.
+        float               interpolation_speed_ratio; // Ratio of soft joint limit, range [0, 1]
 
-        float               gripper_joint[MAX_ARM_SIZE][MAX_GRIPPER_JOINT_SIZE];
+        float               gripper_joint[MAX_GRIPPER_SIZE][MAX_GRIPPER_JOINT_SIZE];
 
         /** Active member selected by payload.activated_control_strategy + enable_jog. */
         union {
             float               arm_joint[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
+
+            /** @brief Arm tool pose relative to the base frame */
             CartesianTarget     arm_tool_cartesian[MAX_ARM_SIZE];
+
             JogCommand          arm_joint_jog[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
-            JogCommand          arm_cartesian_jog[MAX_ARM_SIZE][6]; // x,y,z, RX,RY,RZ (frame from SdkConfigReq.arm[].frame_reference)
+
+            /** 
+            * @brief Relative operational space jog parameters.
+            * @details Array index map: 0=X, 1=Y, 2=Z, 3=RX, 4=RY, 5=RZ. 
+            *          Rotations [3-5] specify an Extrinsic XYZ Euler sequence evaluated 
+            *          via sequential left-multiplication: R = R_x(RX) * R_y(RY) * R_z(RZ).
+            *          Reference frames are set by `cartesian_jog_trans_frame` and `cartesian_jog_rot_frame`.
+            */
+            JogCommand          arm_cartesian_jog[MAX_ARM_SIZE][6];
         };
     };
 
@@ -287,7 +314,8 @@ namespace robot::platform {
             uint8_t             gripper_joint_size[MAX_GRIPPER_SIZE];
 
             /** Echo of the configured strategy; not changed by SdkCommandReq (use SdkConfigReq). */
-            ControlStrategy     activated_control_strategy = ControlStrategy::kJoint;
+            ControlStrategy     activated_control_strategy[MAX_ARM_SIZE];
+            TeachingCommand     teaching_cmd = TeachingCommand::kNone;
             uint8_t             enable_jog = 0;
             uint8_t             target_count = 0;
             SinglePointTarget   target[MAX_WAYPOINTS];
@@ -338,9 +366,9 @@ namespace robot::platform {
                 SmoothingMethod     filter_type;
                 ControlType         target_type;
                 ControlType         actuator_mode;
-                PlaybackState       playback_cmd;
                 
-                FrameReference      frame_reference = FrameReference::kTool;
+                FrameReference      cartesian_jog_trans_frame = FrameReference::kTool;
+                FrameReference      cartesian_jog_rot_frame = FrameReference::kTool;
                 uint8_t             reset_control_mem;
                 uint8_t             reset_interpolation;
 
@@ -386,8 +414,8 @@ namespace robot::platform {
                 SmoothingMethod     filter_type;
                 ControlType         target_type;
                 ControlType         actuator_mode;
-                PlaybackState       playback_cmd;
-                FrameReference      frame_reference = FrameReference::kTool;
+                FrameReference      cartesian_jog_trans_frame = FrameReference::kTool; //Cartesian jog translation reference frame
+                FrameReference      cartesian_jog_rot_frame = FrameReference::kTool; //Cartesian jog rotation reference frame
 
                 PositionTarget      tool_offset;
                 uint8_t             enabled_joint[MAX_ARM_JOINT_SIZE];
@@ -621,7 +649,7 @@ namespace robot::platform {
         float body_forces[6];
     };
 
-//////////////////////////////////// Use in cuarm_upper_software////////////////////////////////////
+//////////////////////////////////// Use in cuarm_upper_software - remote page////////////////////////////////////
     enum class PanelRemoteState: uint8_t{kStop, kStart};  
     struct PanelState{
         PanelRemoteState state;
@@ -671,7 +699,8 @@ namespace robot::platform {
     void print(const SdkHeartbeatReq& value);
     void print(const SdkSafeguardReq& value);
     void print(const SrvState& value);
-    void print_diagnostic_flags(uint64_t flags);
+    std::vector<std::string> diagnosticFlagsToString(uint64_t flags);
+    void printDiagnosticFlags(uint64_t flags);
     std::pair<std::string, std::string> getStatusErrorMessage(CommandResponseStatus status);
 
     // //Get initial request

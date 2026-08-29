@@ -118,52 +118,44 @@ namespace robot::platform::serialization {
         }
 
         void writeArmUnion(const SinglePointTarget& src, std::uint8_t*& cursor, std::size_t& remaining,
-            ControlStrategy strategy, uint8_t enable_jog,
+            const ControlStrategy* strategy, uint8_t enable_jog,
             std::uint8_t arm_size, const std::uint8_t* arm_joint_size) {
-            if (enable_jog) {
-                if (strategy == ControlStrategy::kCartesianLine || strategy == ControlStrategy::kCartesian) {
-                    for (uint32_t i = 0; i < arm_size; ++i) {
+            for (uint32_t i = 0; i < arm_size; ++i) {
+                if (enable_jog) {
+                    if (strategy[i] == ControlStrategy::kCartesianLine || strategy[i] == ControlStrategy::kCartesian) {
                         writeRaw(src.arm_cartesian_jog[i], 6, cursor, remaining);
-                    }
-                } else {
-                    for (uint32_t i = 0; i < arm_size; ++i) {
+                    } else {
                         writeRaw(src.arm_joint_jog[i], arm_joint_size[i], cursor, remaining);
                     }
-                }
-            } else if (strategy == ControlStrategy::kCartesianLine || strategy == ControlStrategy::kCartesian) {
-                writeCartesianArray(src.arm_tool_cartesian, cursor, remaining, arm_size);
-            } else {
-                for (uint32_t i = 0; i < arm_size; ++i) {
+                } else if (strategy[i] == ControlStrategy::kCartesianLine || strategy[i] == ControlStrategy::kCartesian) {
+                    writeCartesianTarget(src.arm_tool_cartesian[i], cursor, remaining);
+                } else {
                     writeRaw(src.arm_joint[i], arm_joint_size[i], cursor, remaining);
                 }
             }
         }
 
         void readArmUnion(const std::uint8_t*& cursor, SinglePointTarget& dst,
-            ControlStrategy strategy, uint8_t enable_jog,
+            const ControlStrategy* strategy, uint8_t enable_jog,
             std::uint8_t arm_size, const std::uint8_t* arm_joint_size) {
             std::memset(&dst.arm_joint, 0, sizeof(dst.arm_joint));
-            if (enable_jog) {
-                if (strategy == ControlStrategy::kCartesianLine || strategy == ControlStrategy::kCartesian) {
-                    for (uint32_t i = 0; i < arm_size; ++i) {
+            for (uint32_t i = 0; i < arm_size; ++i) {
+                if (enable_jog) {
+                    if (strategy[i] == ControlStrategy::kCartesianLine || strategy[i] == ControlStrategy::kCartesian) {
                         readRaw(cursor, dst.arm_cartesian_jog[i], 6);
-                    }
-                } else {
-                    for (uint32_t i = 0; i < arm_size; ++i) {
+                    } else {
                         readRaw(cursor, dst.arm_joint_jog[i], arm_joint_size[i]);
                     }
-                }
-            } else if (strategy == ControlStrategy::kCartesianLine || strategy == ControlStrategy::kCartesian) {
-                readCartesianArray(cursor, dst.arm_tool_cartesian, arm_size);
-            } else {
-                for (uint32_t i = 0; i < arm_size; ++i) {
+                } else if (strategy[i] == ControlStrategy::kCartesianLine || strategy[i] == ControlStrategy::kCartesian) {
+                    readCartesianTarget(cursor, dst.arm_tool_cartesian[i]);
+                } else {
                     readRaw(cursor, dst.arm_joint[i], arm_joint_size[i]);
                 }
             }
         }
 
         void writeSinglePointTarget(const SinglePointTarget& src, std::uint8_t*& cursor, std::size_t& remaining, 
-            ControlStrategy strategy, uint8_t enable_jog,
+            const ControlStrategy* strategy, uint8_t enable_jog,
             std::uint8_t arm_size, const std::uint8_t* arm_joint_size, std::uint8_t gripper_size, const std::uint8_t* gripper_joint_size) {
             writeRaw(src.interpolation_t, cursor, remaining);
             writeRaw(src.interpolation_speed_ratio, cursor, remaining);
@@ -174,7 +166,7 @@ namespace robot::platform::serialization {
         }
 
         void readSinglePointTarget(const std::uint8_t*& cursor, SinglePointTarget& dst, 
-            ControlStrategy strategy, uint8_t enable_jog,
+            const ControlStrategy* strategy, uint8_t enable_jog,
             std::uint8_t arm_size, const std::uint8_t* arm_joint_size, std::uint8_t gripper_size, const std::uint8_t* gripper_joint_size) {
             readRaw(cursor, dst.interpolation_t);
             readRaw(cursor, dst.interpolation_speed_ratio);
@@ -185,7 +177,7 @@ namespace robot::platform::serialization {
         }
 
         void writeSinglePointArray(const SinglePointTarget* src, std::uint8_t*& cursor, std::size_t& remaining, 
-            uint32_t count, ControlStrategy strategy, uint8_t enable_jog,
+            uint32_t count, ControlStrategy* strategy, uint8_t enable_jog,
             std::uint8_t arm_size, const std::uint8_t* arm_joint_size, std::uint8_t gripper_size, const std::uint8_t* gripper_joint_size) {
             for (uint32_t i = 0; i < count; ++i) {
                 writeSinglePointTarget(src[i], cursor, remaining, strategy, enable_jog, arm_size, arm_joint_size, gripper_size, gripper_joint_size);
@@ -193,7 +185,7 @@ namespace robot::platform::serialization {
         }
 
         void readSinglePointArray(const std::uint8_t*& cursor, SinglePointTarget* dst, 
-            uint32_t count, ControlStrategy strategy, uint8_t enable_jog,
+            uint32_t count, ControlStrategy* strategy, uint8_t enable_jog,
             std::uint8_t arm_size, const std::uint8_t* arm_joint_size, std::uint8_t gripper_size, const std::uint8_t* gripper_joint_size) {
             for (uint32_t i = 0; i < count; ++i) {
                 readSinglePointTarget(cursor, dst[i], strategy, enable_jog, arm_size, arm_joint_size, gripper_size, gripper_joint_size);
@@ -274,7 +266,10 @@ namespace robot::platform::serialization {
             writeRaw(value.payload.gripper_size, cursor, remaining);
             writeRaw(value.payload.arm_joint_size, value.payload.arm_size, cursor, remaining);
             writeRaw(value.payload.gripper_joint_size, value.payload.gripper_size, cursor, remaining);
-            writeEnum(value.payload.activated_control_strategy, cursor, remaining);
+            for (uint32_t i = 0; i < value.payload.arm_size; ++i) {
+                writeEnum(value.payload.activated_control_strategy[i], cursor, remaining);
+            }
+            writeEnum(value.payload.teaching_cmd, cursor, remaining);
             writeRaw(value.payload.enable_jog, cursor, remaining);
             writeRaw(value.payload.target_count, cursor, remaining);
             write_phase.push_back(std::make_pair("after target_count", cursor - buffer));
@@ -346,8 +341,8 @@ namespace robot::platform::serialization {
                 writeEnum(value.payload.arm[i].filter_type, cursor, remaining);
                 writeEnum(value.payload.arm[i].target_type, cursor, remaining);
                 writeEnum(value.payload.arm[i].actuator_mode, cursor, remaining);
-                writeEnum(value.payload.arm[i].playback_cmd, cursor, remaining);
-                writeEnum(value.payload.arm[i].frame_reference, cursor, remaining);
+                writeEnum(value.payload.arm[i].cartesian_jog_trans_frame, cursor, remaining);
+                writeEnum(value.payload.arm[i].cartesian_jog_rot_frame, cursor, remaining);
                 writeRaw(value.payload.arm[i].reset_control_mem, cursor, remaining);
                 writeRaw(value.payload.arm[i].reset_interpolation, cursor, remaining);
                 write_phase.push_back(std::make_pair("after arm[" + std::to_string(i) + "]'s reset_interpolation", cursor - buffer));
@@ -403,9 +398,9 @@ namespace robot::platform::serialization {
                 writeEnum(value.payload.arm[i].filter_type, cursor, remaining);
                 writeEnum(value.payload.arm[i].target_type, cursor, remaining);
                 writeEnum(value.payload.arm[i].actuator_mode, cursor, remaining);
-                writeEnum(value.payload.arm[i].playback_cmd, cursor, remaining);
-                writeEnum(value.payload.arm[i].frame_reference, cursor, remaining);
-                write_phase.push_back(std::make_pair("after arm[" + std::to_string(i) + "]'s frame_reference", cursor - buffer));
+                writeEnum(value.payload.arm[i].cartesian_jog_trans_frame, cursor, remaining);
+                writeEnum(value.payload.arm[i].cartesian_jog_rot_frame, cursor, remaining);
+                write_phase.push_back(std::make_pair("after arm[" + std::to_string(i) + "]'s cartesian_jog_trans_frame and cartesian_jog_rot_frame", cursor - buffer));
                 
                 writePositionTarget(value.payload.arm[i].tool_offset, cursor, remaining);
                 writeRaw(value.payload.arm[i].enabled_joint, value.payload.arm_joint_size[i], cursor, remaining);
@@ -752,7 +747,10 @@ namespace robot::platform::serialization {
         readRaw(cursor, value.payload.gripper_joint_size, value.payload.gripper_size);  
         write_phase.push_back(std::make_pair("after gripper_joint_size", cursor - buffer));
 
-        readEnum(cursor, value.payload.activated_control_strategy);
+        for (uint32_t i = 0; i < value.payload.arm_size; ++i) {
+            readEnum(cursor, value.payload.activated_control_strategy[i]);
+        }
+        readEnum(cursor, value.payload.teaching_cmd);
         readRaw(cursor, value.payload.enable_jog);
         readRaw(cursor, value.payload.target_count);
         for (uint32_t i = 0; i < value.payload.target_count; ++i) {
@@ -808,8 +806,8 @@ namespace robot::platform::serialization {
             readEnum(cursor, value.payload.arm[i].filter_type);
             readEnum(cursor, value.payload.arm[i].target_type);
             readEnum(cursor, value.payload.arm[i].actuator_mode);
-            readEnum(cursor, value.payload.arm[i].playback_cmd);
-            readEnum(cursor, value.payload.arm[i].frame_reference);
+            readEnum(cursor, value.payload.arm[i].cartesian_jog_trans_frame);
+            readEnum(cursor, value.payload.arm[i].cartesian_jog_rot_frame);
             readRaw(cursor, value.payload.arm[i].reset_control_mem);
             readRaw(cursor, value.payload.arm[i].reset_interpolation);
             readRaw(cursor, value.payload.arm[i].enable_joint, value.payload.arm_joint_size[i]);
@@ -857,8 +855,8 @@ namespace robot::platform::serialization {
             readEnum(cursor, value.payload.arm[i].filter_type);
             readEnum(cursor, value.payload.arm[i].target_type);
             readEnum(cursor, value.payload.arm[i].actuator_mode);
-            readEnum(cursor, value.payload.arm[i].playback_cmd);
-            readEnum(cursor, value.payload.arm[i].frame_reference);
+            readEnum(cursor, value.payload.arm[i].cartesian_jog_trans_frame);
+            readEnum(cursor, value.payload.arm[i].cartesian_jog_rot_frame);
             readPositionTarget(cursor, value.payload.arm[i].tool_offset);
             write_phase.push_back(std::make_pair("after tool_offset", cursor - buffer));
 

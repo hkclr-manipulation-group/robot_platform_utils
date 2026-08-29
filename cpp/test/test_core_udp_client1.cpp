@@ -63,7 +63,7 @@ std::string resolveKeysPath()
 #endif
 }
 
-uint32_t performHandshake(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client)
+uint32_t performHandshake(CoreUdpClient& client)
 {
     constexpr uint16_t handshakeSeq = 1;
     constexpr int kMaxAttempts = 3;
@@ -101,7 +101,7 @@ uint32_t performHandshake(CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreRes
 }
 
 void sendDemoConfig(
-    CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client,
+    CoreUdpClient& client,
     uint32_t sessionId,
     uint32_t sequenceId,
     bool readOnly)
@@ -129,7 +129,7 @@ void sendDemoConfig(
 }
 
 void sendDemoCommand(
-    CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr>& client,
+    CoreUdpClient& client,
     uint32_t sessionId,
     uint32_t sequenceId)
 {
@@ -144,7 +144,7 @@ void sendDemoCommand(
     command.payload.arm_joint_size[0] = 7;
     command.payload.gripper_joint_size[0] = 1;
     command.payload.enable_jog = 0;
-    command.payload.activated_control_strategy = ControlStrategy::kJoint;
+    command.payload.activated_control_strategy[0] = ControlStrategy::kJoint;
     command.payload.target_count = 1;
 
     CoreRequestVariantPtr request = std::make_unique<CoreRequestVariant>(command);
@@ -175,7 +175,7 @@ int main()
             throw std::runtime_error("Failed to load client keys from " + resolveKeysPath());
         }
 
-        CoreUdpClient<SrvState, CoreRequestVariantPtr, CoreResponseVariantPtr> client(
+        CoreUdpClient client(
             kServerIp,
             kCoreRequestPort,
             kTelemetryPort,
