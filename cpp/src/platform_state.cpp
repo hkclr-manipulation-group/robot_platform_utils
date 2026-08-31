@@ -469,6 +469,9 @@ namespace robot::platform {
         if (flags & DiagnosticFlags::kPlanPointSkipped){
             result.push_back("PlanPointSkipped: Duplicated points skipped");
         }
+        if (flags & DiagnosticFlags::kPlanInvalidSetting){
+            result.push_back("PlanInvalidSetting: Invalid setting on interpolator");
+        }
 
         // --- Fault Flags ---
         if (flags & DiagnosticFlags::kFaultPosHardLimitReached){

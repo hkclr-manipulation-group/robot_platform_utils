@@ -224,7 +224,7 @@ namespace robot::platform {
         constexpr uint64_t kPlanDeltaTooLarge            = 1ULL << 17; // Distance between points is too large for a dynamic timeline
         constexpr uint64_t kPlanVelocitySnap             = 1ULL << 18; // Large velocity shift over zero distance
         constexpr uint64_t kPlanPointSkipped             = 1ULL << 19; // Duplicated points skipped
-        constexpr uint64_t kPlanInvalidSetting           = 1ULL << 20; // Invalid setting on Interpolator
+        constexpr uint64_t kPlanInvalidSetting           = 1ULL << 51; // Invalid setting on Interpolator
 
         // --- Fault Flags ---
         constexpr uint64_t kFaultPosHardLimitReached     = 1ULL << 20;
