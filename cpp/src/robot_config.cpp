@@ -381,6 +381,11 @@ RtControlConfig parseRtControlConfig(
         rt_control.robotics_library =
             readScalar<std::string>(node["robotics_library"], context + ".robotics_library");
     }
+    if (node["actuator_mode_under_position_control"]) {
+        rt_control.actuator_mode_under_position_control = readScalar<std::string>(
+            node["actuator_mode_under_position_control"],
+            context + ".actuator_mode_under_position_control");
+    }
     if (node["self_collision_detection"]) {
         rt_control.self_collision_detection = parseSelfCollisionDetectionConfig(
             node["self_collision_detection"], context + ".self_collision_detection");
