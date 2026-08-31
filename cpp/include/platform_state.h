@@ -26,6 +26,16 @@ namespace robot::platform {
         #define HMAC_KEY_SIZE           16U
     #endif
 
+    /**
+     * @brief The control strategy to apply.
+     * @param kJoint The joint space control strategy.
+     * @param kCartesian The cartesian space control strategy.
+     * @param kCartesianLine The cartesian line control strategy.
+     * @param kNullspace The nullspace control strategy.
+     * @param kGravityCompensation The gravity compensation control strategy.
+     * @param kRecord The record control strategy.
+     * @param kPlayback The playback control strategy.
+     */
     enum class ControlStrategy: uint8_t{
         kJoint = 0, 
         kCartesian, 
@@ -37,6 +47,16 @@ namespace robot::platform {
 
     enum class FrameReference: uint8_t { kTool, kBase };
 
+    /**
+     * @brief The smoothing method to apply.
+     * @param kLinear The linear smoothing method.
+     * @param kCos The cosine smoothing method.
+     * @param kCubic The cubic smoothing method.
+     * @param kQuintic The quintic smoothing method.
+     * @param kQuinticPath The quintic path smoothing method.
+     * @param kLowPassFilter The low pass filter smoothing method.
+     * @param kNone The none smoothing method.
+     */
     enum class SmoothingMethod: uint8_t{
         kLinear,
         kCos,
@@ -47,6 +67,17 @@ namespace robot::platform {
         kNone,
     };
 
+    /**
+     * @brief The motion phase to apply.
+     * @param kIdle The idle motion phase.
+     * @param kInitialized The initialized motion phase.
+     * @param kAcceleration The acceleration motion phase.
+     * @param kConstantVelocity The constant velocity motion phase.
+     * @param kDeceleration The deceleration motion phase.
+     * @param kFiltering The filtering motion phase.
+     * @param kFinished The finished motion phase.
+     * @param kInterrupted The interrupted motion phase.
+     */
     enum class MotionPhase : uint8_t {
         kIdle,
         kInitialized,
@@ -58,6 +89,13 @@ namespace robot::platform {
         kInterrupted,
     };
 
+    /**
+     * @brief The control type to apply.
+     * @param kPosition The position control type.
+     * @param kVelocity The velocity control type.
+     * @param kTorque The torque control type.
+     * @param kInvalid The invalid control type.
+     */
     enum class ControlType: uint8_t{
         kPosition=0, 
         kVelocity, 
@@ -65,6 +103,13 @@ namespace robot::platform {
         kInvalid=255,
     };
 
+    /**
+     * @brief The cartesian line move strategy to apply.
+     * @param kRejectEntirely The reject entirely cartesian line move strategy.
+     * @param kStopAtBoundary The stop at boundary cartesian line move strategy.
+     * @param kDeviateAndBypassing The deviate and bypassing cartesian line move strategy.
+     * @param kSegmentedExecution The segmented execution cartesian line move strategy.
+     */
     enum class CartesianLineMoveStrategy : uint8_t  {
         kRejectEntirely = 0, // Abort the move immediately; do not start moving.
         kStopAtBoundary = 1, // Move and stop smoothly at the last reachable point before the failure.
@@ -88,13 +133,37 @@ namespace robot::platform {
     */
     enum class TeachingCommand: uint8_t{kNone, kStartRecord, kStopRecord, kStartReplay, kStopReplay, kResetReplay};
 
+    /**
+     * @brief The playback state to apply.
+     * @param kStop The stop playback state.
+     * @param kStart The start playback state.
+     * @param kReset The reset playback state.
+     */
+    enum class PlaybackState: uint8_t{
+        kStop = 0,
+        kStart = 1,
+        kReset = 2,
+    };
+
     /** Per-axis jog request when SdkCommandReq.payload.enable_jog is set. */
+    /**
+     * @brief The jog command to apply.
+     * @param kStop The stop jog command.
+     * @param kIncrease The increase jog command.
+     * @param kDecrease The decrease jog command.
+     */
     enum class JogCommand: uint8_t {
         kStop = 0,
         kIncrease = 1,
         kDecrease = 2,
     };
     
+    /**
+     * @brief The plan result to apply.
+     * @param kSuccess The success plan result.
+     * @param kPoseNotReachable The pose not reachable plan result.
+     * @param kLinearPathFailed The linear path failed plan result.
+     */
     enum class PlanResult : uint8_t {
         kNone                       = 0, //No applicable
         kSuccess                    = 1,  // IK passed, time allocation valid, safe to execute
@@ -102,6 +171,18 @@ namespace robot::platform {
         kLinearPathFailed           = 3,  // Reachable target, but continuous linear path is blocked (Singularity / Joint Limit)
     };
 
+    /**
+     * @brief The system state to apply.
+     * @param kUnknown The unknown system state.
+     * @param kStartup The startup system state.
+     * @param kIdle The idle system state.
+     * @param kMoving The moving system state.
+     * @param kSettling The settling system state.
+     * @param kError The error system state.
+     * @param kRecovery The recovery system state.
+     * @param kShutdown The shutdown system state.
+     * @param kOffline The offline system state.
+     */
     enum class SystemState : uint8_t {
         kUnknown        = 0, // Safety fallback
         kStartup        = 1,
