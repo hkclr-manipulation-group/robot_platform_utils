@@ -65,27 +65,36 @@ bool processedCacheStillValid(const ProcessedYamlCacheEntry& entry) {
 }
 
 void mergeYamlNodes(YAML::Node& target, const YAML::Node& source) {
+    if (!source || !source.IsDefined()) {
+        return;
+    }
     if (!source.IsMap()) {
-        target = source;
+        target = YAML::Clone(source);
         return;
     }
     if (!target || !target.IsMap()) {
         target = YAML::Node(YAML::NodeType::Map);
     }
 
+    std::vector<std::pair<std::string, YAML::Node>> entries;
+    entries.reserve(source.size());
     for (auto it = source.begin(); it != source.end(); ++it) {
-        const std::string key = it->first.as<std::string>();
-        const YAML::Node& value = it->second;
+        entries.emplace_back(it->first.as<std::string>(), YAML::Clone(it->second));
+    }
+
+    for (const auto& entry : entries) {
+        const std::string& key = entry.first;
+        const YAML::Node& value = entry.second;
         YAML::Node existing = target[key];
         if (existing && existing.IsMap() && value.IsMap()) {
             mergeYamlNodes(existing, value);
             target[key] = existing;
         } else if (existing && existing.IsSequence() && value.IsSequence()) {
             for (std::size_t i = 0; i < value.size(); ++i) {
-                target[key].push_back(value[i]);
+                target[key].push_back(YAML::Clone(value[i]));
             }
         } else {
-            target[key] = value;
+            target[key] = YAML::Clone(value);
         }
     }
 }
@@ -139,6 +148,7 @@ YAML::Node loadYamlFileCached(const std::filesystem::path& path) {
 YAML::Node processImportsRecursive(
     const YAML::Node& config,
     const std::string& import_root,
+    const std::string& context_path,
     std::unordered_set<std::string>& visited,
     std::vector<std::pair<std::string, FileTime>>& dependencies) {
     auto processSingleImport = [&](const std::string& import_path) -> YAML::Node {
@@ -163,21 +173,31 @@ YAML::Node processImportsRecursive(
 
         YAML::Node imported_config = loadYamlFileCached(full_path);
         YAML::Node processed = processImportsRecursive(
-            imported_config, import_root, visited, dependencies);
+            imported_config, import_root, full_path.string(), visited, dependencies);
         visited.erase(visit_key);
         return processed;
     };
+
+    if (!config || !config.IsDefined()) {
+        return YAML::Node();
+    }
 
     if (config.IsMap()) {
         YAML::Node result(YAML::NodeType::Map);
         for (auto it = config.begin(); it != config.end(); ++it) {
             const std::string key = it->first.as<std::string>();
-            const YAML::Node& child = it->second;
+            const YAML::Node child = it->second;
             if (key == "import_yaml") {
+                if (!child.IsScalar()) {
+                    throw YamlLoadError(
+                        context_path + ": import_yaml must be a scalar path, got "
+                        + std::to_string(static_cast<int>(child.Type())));
+                }
                 const YAML::Node imported = processSingleImport(child.as<std::string>());
                 mergeYamlNodes(result, imported);
             } else {
-                result[key] = processImportsRecursive(child, import_root, visited, dependencies);
+                result[key] = processImportsRecursive(
+                    child, import_root, context_path + "." + key, visited, dependencies);
             }
         }
         return result;
@@ -186,7 +206,8 @@ YAML::Node processImportsRecursive(
     if (config.IsSequence()) {
         YAML::Node result(YAML::NodeType::Sequence);
         for (std::size_t i = 0; i < config.size(); ++i) {
-            result.push_back(processImportsRecursive(config[i], import_root, visited, dependencies));
+            result.push_back(processImportsRecursive(
+                config[i], import_root, context_path + "[" + std::to_string(i) + "]", visited, dependencies));
         }
         return result;
     }
@@ -255,7 +276,7 @@ void printYamlNode(const YAML::Node& node, int indent, const std::string& first_
     if (node.IsMap()) {
         for (auto it = node.begin(); it != node.end(); ++it) {
             const std::string key = it->first.as<std::string>();
-            const YAML::Node value = node[key];
+            const YAML::Node value = it->second;
             const std::string use_prefix = (it == node.begin()) ? line_prefix : prefix;
             std::cout << use_prefix << key << ": ";
             if (value.IsScalar()) {
@@ -342,6 +363,7 @@ YAML::Node loadYamlConfig(const std::string& filename) {
     YAML::Node processed = processImportsRecursive(
         root_config,
         path.parent_path().string(),
+        path.string(),
         visited,
         dependencies);
 
