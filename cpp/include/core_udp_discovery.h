@@ -16,6 +16,9 @@ struct DiscoveredServer {
     /** robot_timestamp_us = local_timestamp_us + time_offset_us (from handshake). */
     int64_t time_offset_us = 0;
     int64_t handshake_rtt_us = 0;
+    uint8_t protocol_major = 1;
+    uint8_t protocol_minor = 0;
+    uint32_t protocol_capabilities = 0;
 };
 
 /**

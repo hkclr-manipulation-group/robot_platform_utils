@@ -28,6 +28,9 @@ namespace robot::platform {
 
     /** Sentinel for SrvState.current_client_id when no client holds control (client_id 0 is reserved). */
     constexpr uint16_t kNoActiveClientId = 0;
+#ifndef MAX_PROTOCOL_EXTENSION_SIZE
+    #define MAX_PROTOCOL_EXTENSION_SIZE 1024U
+#endif
 
     /**
      * @brief The control strategy to apply.
@@ -283,6 +286,7 @@ namespace robot::platform {
         kInvalidSessionId           = 8, // Session ID expired, unauthenticated, or mismatched
         kInvalidConfig              = 9, // Configuration is invalid
         kTimeout                    = 10, // Configuration update timed out
+        kUnsupportedProtocolVersion = 11, // No compatible protocol major version
         kUnknown                    = 255
     };
 
@@ -300,6 +304,37 @@ namespace robot::platform {
         kSdkReleaseControlRes,
         kSdkRecoveryReq,
         kSdkRecoveryRes,
+    };
+
+    namespace Protocol {
+        constexpr uint8_t kLegacyMajor = 1;
+        constexpr uint8_t kCurrentMajor = 1;
+        constexpr uint8_t kCurrentMinor = 0;
+        constexpr uint32_t kHandshakeExtensionMagic = 0x31544F52U; // "ROT1"
+
+        namespace Capability {
+            constexpr uint32_t kAppendOnlyTrailingFields = 1U << 0;
+            constexpr uint32_t kFlatBuffersPayload = 1U << 1;
+        }
+        constexpr uint32_t kCurrentCapabilities =
+            Capability::kAppendOnlyTrailingFields | Capability::kFlatBuffersPayload;
+    }
+
+    struct ProtocolNegotiation {
+        // Local-only switch: legacy V1 serialization remains byte-for-byte stable
+        // unless the caller explicitly requests negotiation.
+        bool extension_present = false;
+        uint8_t min_major = Protocol::kLegacyMajor;
+        uint8_t max_major = Protocol::kCurrentMajor;
+        uint8_t max_minor = Protocol::kCurrentMinor;
+        uint32_t capabilities = Protocol::kCurrentCapabilities;
+    };
+
+    struct NegotiatedProtocol {
+        bool extension_present = false;
+        uint8_t major = Protocol::kLegacyMajor;
+        uint8_t minor = 0;
+        uint32_t capabilities = 0;
     };
 
     enum class NetworkConfigAction : uint8_t {
@@ -556,6 +591,9 @@ namespace robot::platform {
         uint16_t telemetry_port;              // Port for telemetry data
         uint64_t timestamp_us;                // Integrity timestamp
         uint8_t  security_hmac[HMAC_KEY_SIZE];
+        ProtocolNegotiation protocol;
+        // Local-only serialization switch. Legacy peers keep the V1 wire layout.
+        bool use_flatbuffers = false;
     };
 
     struct SdkHandshakeRes { //For server to respond with a session id to the client
@@ -574,6 +612,11 @@ namespace robot::platform {
         }payload;
         
         uint8_t  security_hmac[HMAC_KEY_SIZE];
+        // Local-only serialization switch. Legacy peers predate robot_name.
+        bool include_robot_name = true;
+        NegotiatedProtocol protocol;
+        // Local-only serialization switch. Legacy peers keep the V1 wire layout.
+        bool use_flatbuffers = false;
     };
 
     struct SdkReleaseControlReq {

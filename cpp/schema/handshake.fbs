@@ -1,0 +1,49 @@
+namespace robot.platform.fb;
+
+enum CommandResponseStatus : ubyte {
+  kSuccess = 0,
+  kRejectedBlocked = 1,
+  kRejectedConfigNotReady = 2,
+  kRejectedFaulted = 3,
+  kRejectedSequenceId = 4,
+  kRejectedConfigRequired = 5,
+  kInvalidCommand = 6,
+  kInvalidClientId = 7,
+  kInvalidSessionId = 8,
+  kInvalidConfig = 9,
+  kTimeout = 10,
+  kUnsupportedProtocolVersion = 11,
+  kUnknown = 255
+}
+
+table ProtocolNegotiation {
+  extension_present:bool = false;
+  min_major:ubyte = 1;
+  max_major:ubyte = 1;
+  max_minor:ubyte = 0;
+  capabilities:uint = 0;
+}
+
+table NegotiatedProtocol {
+  extension_present:bool = false;
+  major:ubyte = 1;
+  minor:ubyte = 0;
+  capabilities:uint = 0;
+}
+
+table SdkHandshakeReqBody {
+  sequence_id:uint;
+  telemetry_port:uint16;
+  timestamp_us:ulong;
+  protocol:ProtocolNegotiation;
+}
+
+table SdkHandshakeResBody {
+  request_sequence_id:uint;
+  request_received_us:ulong;
+  response_sent_us:ulong;
+  assigned_session_id:uint;
+  status:CommandResponseStatus;
+  robot_name:string;
+  protocol:NegotiatedProtocol;
+}

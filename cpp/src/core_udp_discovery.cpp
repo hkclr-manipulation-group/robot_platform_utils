@@ -97,6 +97,9 @@ void fillDiscoveredServerFromHandshake(
     out.time_offset_us = time_offset_us;
     out.handshake_rtt_us = handshake_rtt_us;
     out.robot_name = wireRobotNameToString(res.payload.robot_name);
+    out.protocol_major = res.protocol.major;
+    out.protocol_minor = res.protocol.minor;
+    out.protocol_capabilities = res.protocol.capabilities;
 }
 
 bool enableBroadcast(curi_socket_t fd) {
@@ -798,8 +801,9 @@ DiscoveredServer discoverRtServerViaHandshake(
     if (telemetry_port <= 0) {
         throw std::invalid_argument("discoverRtServerViaHandshake: telemetry_port must be > 0");
     }
-    if (max_attempts_per_probe < 1) {
-        max_attempts_per_probe = 1;
+    if (max_attempts_per_probe < 2) {
+        // One negotiated attempt plus one byte-identical legacy fallback.
+        max_attempts_per_probe = 2;
     }
 
     const bool can_sweep = probeListIncludesBroadcastStyleTarget(probe_ips);
@@ -811,9 +815,9 @@ DiscoveredServer discoverRtServerViaHandshake(
     bool sweep_expanded = false;
 
     const std::size_t send_buffer_size =
-        sizeof(CoreRequestVariant) + HMAC_KEY_SIZE;
+        sizeof(CoreRequestVariant) + MAX_PROTOCOL_EXTENSION_SIZE + HMAC_KEY_SIZE;
     const std::size_t ack_buffer_size =
-        sizeof(CoreResponseVariant) + HMAC_KEY_SIZE;
+        sizeof(CoreResponseVariant) + MAX_PROTOCOL_EXTENSION_SIZE + HMAC_KEY_SIZE;
 
     udp_node node{};
     const char local_ip[] = "0.0.0.0";
@@ -852,6 +856,9 @@ DiscoveredServer discoverRtServerViaHandshake(
     }
 
     for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
+        // Try negotiated append-only V1 first. A legacy RT rejects the longer
+        // datagram, so the next attempt uses the byte-identical legacy handshake.
+        handshake.protocol.extension_present = (attempt == 1);
         handshake.sequence_id = sequence_id;
         sendDiscoveryHandshakeBurst(
             node, targets, core_request_port, handshake, send_buffer_size);
@@ -960,8 +967,8 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     if (telemetry_port <= 0) {
         throw std::invalid_argument("discoverAllRtServersViaHandshake: telemetry_port must be > 0");
     }
-    if (max_attempts_per_probe < 1) {
-        max_attempts_per_probe = 1;
+    if (max_attempts_per_probe < 2) {
+        max_attempts_per_probe = 2;
     }
 
     const bool can_sweep = probeListIncludesBroadcastStyleTarget(probe_ips);
@@ -972,9 +979,9 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     bool sweep_expanded = false;
 
     const std::size_t send_buffer_size =
-        sizeof(CoreRequestVariant) + HMAC_KEY_SIZE;
+        sizeof(CoreRequestVariant) + MAX_PROTOCOL_EXTENSION_SIZE + HMAC_KEY_SIZE;
     const std::size_t ack_buffer_size =
-        sizeof(CoreResponseVariant) + HMAC_KEY_SIZE;
+        sizeof(CoreResponseVariant) + MAX_PROTOCOL_EXTENSION_SIZE + HMAC_KEY_SIZE;
 
     udp_node node{};
     const char local_ip[] = "0.0.0.0";
@@ -1015,6 +1022,9 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
         handshake.client_id = client_id;
         handshake.sequence_id = sequence_id;
         handshake.telemetry_port = telemetry_port;
+        handshake.protocol.extension_present = (attempt == 1);
+        sendDiscoveryHandshakeBurst(
+            node, targets, core_request_port, handshake, send_buffer_size);
 
         const float listen_timeout_ms = listenTimeoutMs(timeout_ms, targets.size());
         std::cout << "discoverAllRtServersViaHandshake: attempt " << attempt

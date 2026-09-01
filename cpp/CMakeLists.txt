@@ -102,7 +102,22 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
     # CONFIGURE_DEPENDS: re-scan when sources are added/removed (avoids stale GLOB).
     file(GLOB LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
+    find_program(FLATC_EXECUTABLE flatc REQUIRED)
+    set(FBS_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/schema/handshake.fbs")
+    set(FBS_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    set(FBS_GENERATED_HEADER "${FBS_GENERATED_DIR}/handshake_generated.h")
+    file(MAKE_DIRECTORY "${FBS_GENERATED_DIR}")
+
+    add_custom_command(
+        OUTPUT "${FBS_GENERATED_HEADER}"
+        COMMAND ${FLATC_EXECUTABLE} --cpp -o "${FBS_GENERATED_DIR}" "${FBS_SCHEMA}"
+        DEPENDS "${FBS_SCHEMA}"
+        COMMENT "Generating FlatBuffers code from handshake.fbs"
+    )
+    add_custom_target(robot_platform_fbs_codegen DEPENDS "${FBS_GENERATED_HEADER}")
+
     add_library(robot_platform_utils ${LIB_SOURCES})
+    add_dependencies(robot_platform_utils robot_platform_fbs_codegen)
     add_library(robot::platform_utils ALIAS robot_platform_utils)
     target_link_libraries(robot_platform_utils PUBLIC 
         ${yaml_library}
@@ -118,6 +133,7 @@ if(BUILD_LIB OR BUILD_CPP_TESTS)
     
     target_include_directories(robot_platform_utils PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${FBS_GENERATED_DIR}>
         $<BUILD_INTERFACE:${PARENT_PARENT_DIR}>
         ${OpenSSL_INCLUDE_DIR}
         ${ZLIB_INCLUDE_DIRS}
@@ -171,6 +187,8 @@ if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_CPP_TESTS)
         test_cuarm_udp_client
         test_core_udp_client1
         test_core_udp_client2
+        test_protocol_compatibility
+        test_flatbuffers_handshake
         test_tcp_data_roundtrip
         test_tcp_data_rpc
         test_rpc_capabilities_codec
@@ -178,11 +196,17 @@ if((CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND BUILD_CPP_TESTS)
     )
 
     foreach(test_target ${TEST_NAMES})
-        add_executable(${test_target} "${CMAKE_CURRENT_LIST_DIR}/test/${test_target}.cpp")
+        set(test_source "${CMAKE_CURRENT_LIST_DIR}/test/${test_target}.cpp")
+        if(NOT EXISTS "${test_source}")
+            message(STATUS "Skipping ${test_target}: ${test_source} does not exist")
+            continue()
+        endif()
+        add_executable(${test_target} "${test_source}")
         target_link_libraries(${test_target} PRIVATE robot::platform_utils Threads::Threads)
         if(UNIX AND NOT APPLE)
             target_link_options(${test_target} PRIVATE -pthread)
         endif()
         target_compile_definitions(${test_target} PUBLIC PROJECT_ROOT_DIR=\"${PARENT_PARENT_DIR}\")
+        unset(test_source)
     endforeach()
 endif()

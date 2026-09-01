@@ -26,15 +26,15 @@ bool ackMatches(const CoreResponseVariantPtr& ack, uint16_t client_id, uint32_t 
 }
 
 std::size_t srvStateBufferSize() {
-    return sizeof(SrvState) + HMAC_KEY_SIZE;
+    return sizeof(SrvState) + MAX_PROTOCOL_EXTENSION_SIZE + HMAC_KEY_SIZE;
 }
 
 std::size_t requestBufferSize() {
-    return sizeof(CoreRequestVariant) + HMAC_KEY_SIZE;
+    return sizeof(CoreRequestVariant) + MAX_PROTOCOL_EXTENSION_SIZE + HMAC_KEY_SIZE;
 }
 
 std::size_t responseBufferSize() {
-    return sizeof(CoreResponseVariant) + HMAC_KEY_SIZE;
+    return sizeof(CoreResponseVariant) + MAX_PROTOCOL_EXTENSION_SIZE + HMAC_KEY_SIZE;
 }
 
 bool extractStatus(const CoreResponseVariantPtr& ack, CommandResponseStatus& status) {

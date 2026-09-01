@@ -1,5 +1,7 @@
 #include "platform_serialization.h"
 
+#include "platform_flatbuffers.h"
+
 #include <iostream>
 #include <cstring>
 #include <limits>
@@ -9,6 +11,34 @@
 
 namespace robot::platform::serialization {
     namespace {
+        thread_local const std::uint8_t* read_buffer_end = nullptr;
+
+        class ScopedReadBuffer {
+        public:
+            ScopedReadBuffer(const std::uint8_t* buffer, std::size_t size)
+                : previous_end_(read_buffer_end) {
+                if (buffer == nullptr) {
+                    throw std::runtime_error("ScopedReadBuffer: null buffer.");
+                }
+                read_buffer_end = buffer + size;
+            }
+
+            ~ScopedReadBuffer() {
+                read_buffer_end = previous_end_;
+            }
+
+        private:
+            const std::uint8_t* previous_end_;
+        };
+
+        void ensureReadable(const std::uint8_t* cursor, std::size_t size) {
+            if (read_buffer_end != nullptr
+                && (cursor > read_buffer_end
+                    || size > static_cast<std::size_t>(read_buffer_end - cursor))) {
+                throw std::runtime_error("readRaw: truncated input buffer.");
+            }
+        }
+
         template <typename T>
         void writeRaw(const T& src, std::uint8_t*& cursor, std::size_t& remaining) {
             if (remaining < sizeof(T)) {
@@ -46,8 +76,18 @@ namespace robot::platform::serialization {
         void readRaw(const std::uint8_t*& cursor, T& dst) {
             static_assert(std::is_trivially_copyable_v<T>, "readRaw requires trivially copyable type");
             static_assert(!std::is_array_v<T>, "Use the array overload for raw arrays!");
+            ensureReadable(cursor, sizeof(T));
             std::memcpy(&dst, cursor, sizeof(T)); // Internal implementation takes the address
             cursor += sizeof(T);
+        }
+
+        template <typename T>
+        T peekRaw(const std::uint8_t* cursor) {
+            static_assert(std::is_trivially_copyable_v<T>, "peekRaw requires trivially copyable type");
+            T value{};
+            ensureReadable(cursor, sizeof(T));
+            std::memcpy(&value, cursor, sizeof(T));
+            return value;
         }
 
         template <typename T, std::size_t N>
@@ -59,6 +99,7 @@ namespace robot::platform::serialization {
             }
             
             const std::size_t total_bytes = count * sizeof(T);
+            ensureReadable(cursor, total_bytes);
             std::memcpy(dst, cursor, total_bytes);
             cursor += total_bytes;
         }
@@ -206,7 +247,7 @@ namespace robot::platform::serialization {
         bool verifyReadBuffer(const std::string& function_name, const std::uint8_t* cursor,
             const std::uint8_t* buffer, std::size_t buffer_size,
             const std::vector<std::pair<std::string, std::uint8_t>>& phase_size) {
-            if (cursor != buffer + buffer_size) {
+            if (cursor > buffer + buffer_size) {
                 std::cout << function_name << " read buffer mismatch" << std::endl;
                 std::cout << "\t Read bytes: " << cursor - buffer << ", Correct bytes should be: " << buffer_size << std::endl;
                 for (const auto& phase : phase_size) {
@@ -214,6 +255,8 @@ namespace robot::platform::serialization {
                 }
                 return false;
             }
+            // Authenticated trailing bytes are reserved for append-only protocol
+            // extensions. Older readers intentionally ignore fields they do not know.
             return true;
         }
     }  // namespace
@@ -478,6 +521,11 @@ namespace robot::platform::serialization {
     }
 
     bool toBytes(const SdkHandshakeReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        if (value.use_flatbuffers) {
+            return flatbuffers_codec::encodeSdkHandshakeReq(
+                value, buffer, buffer_size, written_size);
+        }
+
         std::uint8_t* cursor = buffer;
         std::size_t remaining = buffer_size;
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
@@ -490,6 +538,13 @@ namespace robot::platform::serialization {
             writeRaw(value.sequence_id, cursor, remaining);
             writeRaw(value.telemetry_port, cursor, remaining);
             writeRaw(value.timestamp_us, cursor, remaining);
+            if (value.protocol.extension_present) {
+                writeRaw(Protocol::kHandshakeExtensionMagic, cursor, remaining);
+                writeRaw(value.protocol.min_major, cursor, remaining);
+                writeRaw(value.protocol.max_major, cursor, remaining);
+                writeRaw(value.protocol.max_minor, cursor, remaining);
+                writeRaw(value.protocol.capabilities, cursor, remaining);
+            }
         }catch (const std::exception& e) {
             catchToBytesError("catchToBytesError:toBytes(SdkHandshakeReq)", e, value, buffer_size, written_size, write_phase);
             return false;
@@ -500,6 +555,11 @@ namespace robot::platform::serialization {
     }
 
     bool toBytes(const SdkHandshakeRes& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        if (value.use_flatbuffers) {
+            return flatbuffers_codec::encodeSdkHandshakeRes(
+                value, buffer, buffer_size, written_size);
+        }
+
         std::uint8_t* cursor = buffer;
         std::size_t remaining = buffer_size;
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
@@ -515,7 +575,15 @@ namespace robot::platform::serialization {
             writeRaw(value.assigned_session_id, cursor, remaining);
 
             writeEnum(value.payload.status, cursor, remaining);
-            writeRaw(value.payload.robot_name, MAX_NAME_SIZE, cursor, remaining);
+            if (value.include_robot_name) {
+                writeRaw(value.payload.robot_name, MAX_NAME_SIZE, cursor, remaining);
+            }
+            if (value.protocol.extension_present) {
+                writeRaw(Protocol::kHandshakeExtensionMagic, cursor, remaining);
+                writeRaw(value.protocol.major, cursor, remaining);
+                writeRaw(value.protocol.minor, cursor, remaining);
+                writeRaw(value.protocol.capabilities, cursor, remaining);
+            }
             write_phase.push_back(std::make_pair("after robot_name", cursor - buffer));
 
         }catch (const std::exception& e) {
@@ -728,6 +796,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkCommandReq& value) {
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -764,6 +833,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkCommandRes& value) {
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -780,6 +850,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkConfigReq& value) {
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -828,6 +899,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkConfigRes& value) {
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -890,6 +962,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkHeartbeatReq& value) {
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -904,6 +977,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkSafeguardReq& value) {
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -918,6 +992,20 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkHandshakeReq& value){
+        value = SdkHandshakeReq{};
+        if (buffer == nullptr || buffer_size < sizeof(std::uint32_t) + sizeof(MessageType) + sizeof(std::uint16_t)) {
+            return false;
+        }
+
+        const std::uint8_t* payload_cursor =
+            buffer + sizeof(std::uint32_t) + sizeof(MessageType) + sizeof(std::uint16_t);
+        const std::size_t payload_remaining =
+            buffer_size - static_cast<std::size_t>(payload_cursor - buffer);
+        if (flatbuffers_codec::isFlatBufferPayload(payload_cursor, payload_remaining)) {
+            return flatbuffers_codec::decodeSdkHandshakeReq(buffer, buffer_size, value);
+        }
+
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -928,11 +1016,36 @@ namespace robot::platform::serialization {
         readRaw(cursor, value.sequence_id);
         readRaw(cursor, value.telemetry_port);
         readRaw(cursor, value.timestamp_us);
+        value.protocol = ProtocolNegotiation{};
+        if (static_cast<std::size_t>(buffer + buffer_size - cursor) >= sizeof(uint32_t)
+            && peekRaw<uint32_t>(cursor) == Protocol::kHandshakeExtensionMagic) {
+            uint32_t extension_magic = 0;
+            readRaw(cursor, extension_magic);
+            readRaw(cursor, value.protocol.min_major);
+            readRaw(cursor, value.protocol.max_major);
+            readRaw(cursor, value.protocol.max_minor);
+            readRaw(cursor, value.protocol.capabilities);
+            value.protocol.extension_present = true;
+        }
 
         return verifyReadBuffer("fromBytes(SdkHandshakeReq)", cursor, buffer, buffer_size, write_phase);
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkHandshakeRes& value){
+        value = SdkHandshakeRes{};
+        if (buffer == nullptr || buffer_size < sizeof(std::uint32_t) + sizeof(MessageType) + sizeof(std::uint16_t)) {
+            return false;
+        }
+
+        const std::uint8_t* payload_cursor =
+            buffer + sizeof(std::uint32_t) + sizeof(MessageType) + sizeof(std::uint16_t);
+        const std::size_t payload_remaining =
+            buffer_size - static_cast<std::size_t>(payload_cursor - buffer);
+        if (flatbuffers_codec::isFlatBufferPayload(payload_cursor, payload_remaining)) {
+            return flatbuffers_codec::decodeSdkHandshakeRes(buffer, buffer_size, value);
+        }
+
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -947,13 +1060,26 @@ namespace robot::platform::serialization {
 
         readEnum(cursor, value.payload.status);
         std::memset(value.payload.robot_name, 0, MAX_NAME_SIZE);
+        value.include_robot_name = false;
         if (static_cast<std::size_t>(buffer + buffer_size - cursor) >= MAX_NAME_SIZE) {
             readRaw(cursor, value.payload.robot_name, MAX_NAME_SIZE);
+            value.include_robot_name = true;
+        }
+        value.protocol = NegotiatedProtocol{};
+        if (static_cast<std::size_t>(buffer + buffer_size - cursor) >= sizeof(uint32_t)
+            && peekRaw<uint32_t>(cursor) == Protocol::kHandshakeExtensionMagic) {
+            uint32_t extension_magic = 0;
+            readRaw(cursor, extension_magic);
+            readRaw(cursor, value.protocol.major);
+            readRaw(cursor, value.protocol.minor);
+            readRaw(cursor, value.protocol.capabilities);
+            value.protocol.extension_present = true;
         }
         return verifyReadBuffer("fromBytes(SdkHandshakeRes)", cursor, buffer, buffer_size, write_phase);
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkReleaseControlReq& value){
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -969,6 +1095,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkReleaseControlRes& value){
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -985,6 +1112,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkRecoveryReq& value){
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -1000,6 +1128,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkRecoveryRes& value){
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -1016,6 +1145,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SrvState& value) {
+        ScopedReadBuffer read_scope(buffer, buffer_size);
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
