@@ -539,17 +539,42 @@ bool shouldIgnoreLoopbackDiscoveryReply(
     return isLoopbackIp(server_ip) && !isExplicitLoopbackProbe(probe_ips);
 }
 
-bool onlyLoopbackDiscovered(
-    const std::unordered_map<std::string, DiscoveredServer>& by_ip) {
-    if (by_ip.empty()) {
-        return false;
+std::string makeDiscoveryMergeKey(const DiscoveredServer& server) {
+    return std::to_string(server.session_id) + '|' + server.robot_name;
+}
+
+void mergeDiscoveredServerEntry(
+    DiscoveredServer& existing,
+    const DiscoveredServer& incoming) {
+    existing.last_handshake_sequence_id = std::max(
+        existing.last_handshake_sequence_id,
+        incoming.last_handshake_sequence_id);
+    existing.protocol_major = incoming.protocol_major;
+    existing.protocol_minor = incoming.protocol_minor;
+    existing.protocol_capabilities = incoming.protocol_capabilities;
+    if (!incoming.robot_name.empty()) {
+        existing.robot_name = incoming.robot_name;
     }
-    for (const auto& entry : by_ip) {
-        if (!isLoopbackIp(entry.first)) {
-            return false;
-        }
+
+    const bool incoming_is_loopback = isLoopbackIp(incoming.server_ip);
+    const bool existing_is_loopback = isLoopbackIp(existing.server_ip);
+    if (incoming_is_loopback && !existing_is_loopback) {
+        return;
     }
-    return true;
+    if (!incoming_is_loopback && existing_is_loopback) {
+        existing.server_ip = incoming.server_ip;
+        existing.time_offset_us = incoming.time_offset_us;
+        existing.handshake_rtt_us = incoming.handshake_rtt_us;
+        return;
+    }
+
+    if (incoming.handshake_rtt_us > 0
+        && (existing.handshake_rtt_us <= 0
+            || incoming.handshake_rtt_us < existing.handshake_rtt_us)) {
+        existing.server_ip = incoming.server_ip;
+        existing.time_offset_us = incoming.time_offset_us;
+        existing.handshake_rtt_us = incoming.handshake_rtt_us;
+    }
 }
 
 constexpr float kDiscoveryIdleGraceMs = 300.0f;
@@ -591,20 +616,17 @@ bool shouldExpandToSubnetSweep(
     bool can_sweep,
     bool sweep_expanded,
     int attempt,
-    const std::unordered_map<std::string, DiscoveredServer>& by_ip,
+    const std::unordered_map<std::string, DiscoveredServer>& by_identity,
     const DiscoveryListenState& prev_listen_state) {
     if (!can_sweep || sweep_expanded || attempt <= 1) {
         return false;
     }
-    if (!by_ip.empty() && !onlyLoopbackDiscovered(by_ip)) {
+    if (!by_identity.empty()) {
         return false;
     }
     // After the first broadcast/multicast attempt, widen to unicast subnet sweep
     // when no LAN robot was found (matches discoverRtServerViaHandshake timeout path).
-    if (by_ip.empty() && !prev_listen_state.have_any_reply) {
-        return true;
-    }
-    if (onlyLoopbackDiscovered(by_ip)) {
+    if (!prev_listen_state.have_any_reply) {
         return true;
     }
     return prev_listen_state.have_any_reply && !prev_listen_state.have_lan_reply;
@@ -615,7 +637,7 @@ void listenForDiscoveryRepliesUntil(
     const SdkHandshakeReq& handshake,
     uint16_t client_id,
     std::size_t ack_buffer_size,
-    std::unordered_map<std::string, DiscoveredServer>& by_ip,
+    std::unordered_map<std::string, DiscoveredServer>& by_identity,
     DiscoveryListenState& state,
     bool subnet_sweep_phase,
     std::chrono::steady_clock::time_point deadline) {
@@ -705,19 +727,12 @@ void listenForDiscoveryRepliesUntil(
         std::cout << "discoverAllRtServersViaHandshake: reply from "
                   << found.server_ip << " robot_name=" << found.robot_name
                   << " rtt_us=" << found.handshake_rtt_us << "\n";
-        auto existing = by_ip.find(found.server_ip);
-        if (existing == by_ip.end()) {
-            by_ip.emplace(found.server_ip, found);
+        const std::string merge_key = makeDiscoveryMergeKey(found);
+        auto existing = by_identity.find(merge_key);
+        if (existing == by_identity.end()) {
+            by_identity.emplace(merge_key, found);
         } else {
-            existing->second.session_id = found.session_id;
-            existing->second.last_handshake_sequence_id = std::max(
-                existing->second.last_handshake_sequence_id,
-                found.last_handshake_sequence_id);
-            existing->second.time_offset_us = found.time_offset_us;
-            existing->second.handshake_rtt_us = found.handshake_rtt_us;
-            if (!found.robot_name.empty()) {
-                existing->second.robot_name = found.robot_name;
-            }
+            mergeDiscoveredServerEntry(existing->second, found);
         }
     }
 }
@@ -730,7 +745,7 @@ void probeDiscoveryTargets(
     std::size_t send_buffer_size,
     std::size_t ack_buffer_size,
     uint16_t client_id,
-    std::unordered_map<std::string, DiscoveredServer>& by_ip,
+    std::unordered_map<std::string, DiscoveredServer>& by_identity,
     DiscoveryListenState& state,
     float listen_timeout_ms) {
     const bool subnet_sweep_phase = targets.size() > 32;
@@ -743,7 +758,7 @@ void probeDiscoveryTargets(
         sendDiscoveryHandshakeBurst(
             node, targets, core_request_port, handshake, send_buffer_size);
         listenForDiscoveryRepliesUntil(
-            node, handshake, client_id, ack_buffer_size, by_ip, state,
+            node, handshake, client_id, ack_buffer_size, by_identity, state,
             subnet_sweep_phase, deadline);
         return;
     }
@@ -768,7 +783,7 @@ void probeDiscoveryTargets(
             + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                 std::chrono::duration<float, std::milli>(batch_listen_ms));
         listenForDiscoveryRepliesUntil(
-            node, handshake, client_id, ack_buffer_size, by_ip, state,
+            node, handshake, client_id, ack_buffer_size, by_identity, state,
             subnet_sweep_phase, std::min(batch_deadline, deadline));
 
         if (shouldStopDiscoveryListen(
@@ -1001,7 +1016,7 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
 
     configureDiscoverySocket(node.send_fd);
 
-    std::unordered_map<std::string, DiscoveredServer> by_ip;
+    std::unordered_map<std::string, DiscoveredServer> by_identity;
     uint32_t sequence_id = nextDiscoveryHandshakeSequenceId();
     int sequence_resync_remaining = 16;
     uint32_t sequence_jump = 1024;
@@ -1009,7 +1024,7 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
 
     for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
         if (shouldExpandToSubnetSweep(
-                can_sweep, sweep_expanded, attempt, by_ip, prev_listen_state)) {
+                can_sweep, sweep_expanded, attempt, by_identity, prev_listen_state)) {
             targets = buildDiscoveryTargets(
                 probe_ips, /*expand_local_broadcasts=*/true,
                 /*include_subnet_sweep=*/true);
@@ -1041,7 +1056,7 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
             send_buffer_size,
             ack_buffer_size,
             client_id,
-            by_ip,
+            by_identity,
             listen_state,
             listen_timeout_ms);
 
@@ -1052,7 +1067,7 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
                       << " got no reply\n";
         }
 
-        if (listen_state.have_lan_reply || (!by_ip.empty() && !onlyLoopbackDiscovered(by_ip))) {
+        if (listen_state.have_lan_reply || !by_identity.empty()) {
             break;
         }
         if (listen_state.have_any_reply && !listen_state.have_lan_reply && can_sweep
@@ -1074,11 +1089,8 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     }
 
     std::vector<DiscoveredServer> out;
-    out.reserve(by_ip.size());
-    for (auto& entry : by_ip) {
-        if (isLoopbackIp(entry.first)) {
-            continue;
-        }
+    out.reserve(by_identity.size());
+    for (auto& entry : by_identity) {
         out.push_back(std::move(entry.second));
     }
     return out;

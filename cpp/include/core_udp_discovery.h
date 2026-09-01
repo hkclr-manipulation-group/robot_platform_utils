@@ -81,6 +81,9 @@ inline DiscoveredServer discoverRtServerViaHandshake(
  * unanswered, later attempts add a unicast sweep of local /24-/30 subnets
  * (WiFi APs often block broadcast but allow direct unicast). Returns an empty
  * vector when none respond (does not throw).
+ * Ignores loopback (127.0.0.1) replies and merges entries that share the same
+ * session_id + robot_name so one rt_control is listed once.
+ * Returns an empty vector when none respond (does not throw for "not found").
  */
 std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     uint16_t client_id,
