@@ -26,6 +26,9 @@ namespace robot::platform {
         #define HMAC_KEY_SIZE           16U
     #endif
 
+    /** Sentinel for SrvState.current_client_id when no client holds control (client_id 0 is reserved). */
+    constexpr uint16_t kNoActiveClientId = 0;
+
     /**
      * @brief The control strategy to apply.
      * @param kJoint The joint space control strategy.
@@ -633,7 +636,7 @@ namespace robot::platform {
         uint32_t magic_header = MAGIC_HEADER;   //Prevent mis-interpretation of random data as valid command
         uint16_t client_id = 0;                 //0 for multicast
         uint32_t sequence_id;                   //Sequence id of the state
-        uint16_t current_client_id;             //Client id of the current client
+        uint16_t current_client_id = kNoActiveClientId;  // kNoActiveClientId when idle
         uint32_t current_client_sequence_id;    //Sequence id of the current client
         uint64_t timestamp_us;               
 
