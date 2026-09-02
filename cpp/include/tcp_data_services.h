@@ -104,7 +104,6 @@ struct NetworkConfigData {
     std::string eth_netmask;
     std::string eth_gateway;
     std::string eth_dns;
-    std::string server_ip;
 };
 
 bool encodeSetWifiRequest(std::uint8_t wifi_enable, const std::string& ssid, const std::string& password,
@@ -113,11 +112,10 @@ bool decodeSetWifiRequest(const std::uint8_t* data, std::size_t size, std::uint8
                           std::string& password);
 
 bool encodeSetEthStaticRequest(const std::string& eth_ip, std::uint8_t eth_prefix, const std::string& eth_netmask,
-                               const std::string& eth_gateway, const std::string& eth_dns, const std::string& server_ip,
+                               const std::string& eth_gateway, const std::string& eth_dns,
                                std::vector<std::uint8_t>& out);
 bool decodeSetEthStaticRequest(const std::uint8_t* data, std::size_t size, std::string& eth_ip, std::uint8_t& eth_prefix,
-                               std::string& eth_netmask, std::string& eth_gateway, std::string& eth_dns,
-                               std::string& server_ip);
+                               std::string& eth_netmask, std::string& eth_gateway, std::string& eth_dns);
 
 bool encodeNetworkConfigData(const NetworkConfigData& data, std::vector<std::uint8_t>& out);
 bool decodeNetworkConfigData(const std::uint8_t* data, std::size_t size, NetworkConfigData& out);

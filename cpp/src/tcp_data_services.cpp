@@ -275,12 +275,11 @@ bool decodeSetWifiRequest(const std::uint8_t* data, std::size_t size, std::uint8
 }
 
 bool encodeSetEthStaticRequest(const std::string& eth_ip, std::uint8_t eth_prefix, const std::string& eth_netmask,
-                               const std::string& eth_gateway, const std::string& eth_dns, const std::string& server_ip,
+                               const std::string& eth_gateway, const std::string& eth_dns,
                                std::vector<std::uint8_t>& out) {
     out.clear();
     if (!encodeStringField(eth_ip, out) || !writeU8(out, eth_prefix) || !encodeStringField(eth_netmask, out)
-        || !encodeStringField(eth_gateway, out) || !encodeStringField(eth_dns, out)
-        || !encodeStringField(server_ip, out)) {
+        || !encodeStringField(eth_gateway, out) || !encodeStringField(eth_dns, out)) {
         out.clear();
         return false;
     }
@@ -288,12 +287,17 @@ bool encodeSetEthStaticRequest(const std::string& eth_ip, std::uint8_t eth_prefi
 }
 
 bool decodeSetEthStaticRequest(const std::uint8_t* data, std::size_t size, std::string& eth_ip, std::uint8_t& eth_prefix,
-                               std::string& eth_netmask, std::string& eth_gateway, std::string& eth_dns,
-                               std::string& server_ip) {
+                               std::string& eth_netmask, std::string& eth_gateway, std::string& eth_dns) {
     std::size_t offset = 0;
-    return decodeStringField(data, size, offset, eth_ip) && readU8(data, size, offset, eth_prefix)
-        && decodeStringField(data, size, offset, eth_netmask) && decodeStringField(data, size, offset, eth_gateway)
-        && decodeStringField(data, size, offset, eth_dns) && decodeStringField(data, size, offset, server_ip);
+    if (!decodeStringField(data, size, offset, eth_ip) || !readU8(data, size, offset, eth_prefix)
+        || !decodeStringField(data, size, offset, eth_netmask) || !decodeStringField(data, size, offset, eth_gateway)
+        || !decodeStringField(data, size, offset, eth_dns)) {
+        return false;
+    }
+    // Legacy clients may append an unused server_ip field (same as eth_ip).
+    std::string legacy_server_ip;
+    decodeStringField(data, size, offset, legacy_server_ip);
+    return true;
 }
 
 bool encodeNetworkConfigData(const NetworkConfigData& data, std::vector<std::uint8_t>& out) {
@@ -304,7 +308,7 @@ bool encodeNetworkConfigData(const NetworkConfigData& data, std::vector<std::uin
     if (!encodeStringField(data.wifi_ssid, out) || !encodeStringField(data.wifi_password, out)
         || !encodeStringField(data.eth_ip, out) || !writeU8(out, data.eth_prefix)
         || !encodeStringField(data.eth_netmask, out) || !encodeStringField(data.eth_gateway, out)
-        || !encodeStringField(data.eth_dns, out) || !encodeStringField(data.server_ip, out)) {
+        || !encodeStringField(data.eth_dns, out)) {
         out.clear();
         return false;
     }
@@ -318,11 +322,13 @@ bool decodeNetworkConfigData(const std::uint8_t* data, std::size_t size, Network
         || !readU8(data, size, offset, out.wifi_enable) || !decodeStringField(data, size, offset, out.wifi_ssid)
         || !decodeStringField(data, size, offset, out.wifi_password) || !decodeStringField(data, size, offset, out.eth_ip)
         || !readU8(data, size, offset, out.eth_prefix) || !decodeStringField(data, size, offset, out.eth_netmask)
-        || !decodeStringField(data, size, offset, out.eth_gateway) || !decodeStringField(data, size, offset, out.eth_dns)
-        || !decodeStringField(data, size, offset, out.server_ip)) {
+        || !decodeStringField(data, size, offset, out.eth_gateway) || !decodeStringField(data, size, offset, out.eth_dns)) {
         return false;
     }
     out.command_status = command_status;
+    // Legacy servers may append an unused server_ip field (same as eth_ip).
+    std::string legacy_server_ip;
+    decodeStringField(data, size, offset, legacy_server_ip);
     return true;
 }
 
