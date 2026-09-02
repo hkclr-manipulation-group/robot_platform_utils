@@ -43,6 +43,9 @@ enum class StorageMethod : std::uint32_t {
 enum class SystemMethod : std::uint32_t {
     kGetCapabilities = 1,
     kGetVersion = 2,
+    /** Re-baseline encoder_last_position.bin from current joint readings. Request body empty.
+     *  Requires Recovery state and pending encoder baseline confirmation (HTTP 409 otherwise). */
+    kResetEncoderLastPosition = 3,
 };
 
 enum class LogMethod : std::uint32_t {

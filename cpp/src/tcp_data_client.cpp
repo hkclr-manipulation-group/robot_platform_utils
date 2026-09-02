@@ -594,6 +594,11 @@ TcpDataClient::Result TcpDataClient::getCapabilities(std::vector<std::uint8_t>& 
     return rpc;
 }
 
+TcpDataClient::Result TcpDataClient::resetEncoderLastPosition(int timeout_usec) {
+    return callRpc(tcp_data::ServiceId::kSystem,
+                   static_cast<std::uint32_t>(tcp_data::SystemMethod::kResetEncoderLastPosition), {}, timeout_usec);
+}
+
 TcpDataClient::Result TcpDataClient::callNetworkConfig(tcp_data::NetworkMethod method,
                                                        const std::vector<std::uint8_t>& request_body,
                                                        tcp_data::NetworkConfigData& response, int timeout_usec) {

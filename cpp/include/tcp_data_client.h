@@ -91,6 +91,9 @@ public:
     Result setConfig(tcp_data::RtConfigType type, const std::vector<std::int32_t>& values,
                      tcp_data::ConfigValuePayload& result, int timeout_usec = kDefaultTimeoutUsec);
 
+    /** Re-baseline encoder_last_position.bin (Recovery + pending baseline confirmation only). */
+    Result resetEncoderLastPosition(int timeout_usec = kDefaultTimeoutUsec);
+
     void close();
 
 private:
