@@ -94,6 +94,12 @@ public:
     /** Re-baseline encoder_last_position.bin (Recovery + pending baseline confirmation only). */
     Result resetEncoderLastPosition(int timeout_usec = kDefaultTimeoutUsec);
 
+    /** Read persisted arm serial number (empty string when unset). */
+    Result getArmSerialNumber(std::string& out_serial, int timeout_usec = kDefaultTimeoutUsec);
+
+    /** Persist arm serial number (non-empty, max 64 chars). */
+    Result setArmSerialNumber(const std::string& serial, int timeout_usec = kDefaultTimeoutUsec);
+
     void close();
 
 private:

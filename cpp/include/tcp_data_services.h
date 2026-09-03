@@ -23,6 +23,8 @@ enum class ServiceId : std::uint32_t {
     kSystem = 4,
     kNetwork = 5,
     kConfig = 6,
+    /** Runtime settings persistence and profile management. */
+    kRuntimeSettings = 7,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */
@@ -46,6 +48,24 @@ enum class SystemMethod : std::uint32_t {
     /** Re-baseline encoder_last_position.bin from current joint readings. Request body empty.
      *  Requires Recovery state and pending encoder baseline confirmation (HTTP 409 otherwise). */
     kResetEncoderLastPosition = 3,
+    /** Request body empty. Response: encoded serial string (may be empty). */
+    kGetArmSerialNumber = 4,
+    /** Request body: encoded serial string. Response empty on success. */
+    kSetArmSerialNumber = 5,
+    /** Request body empty. Persist current runtime settings to disk. */
+    kFlushRuntimeConfig = 6,
+};
+
+enum class RuntimeSettingsMethod : std::uint32_t {
+    kFlush = 1,
+    kListProfiles = 2,
+    kActivateProfile = 3,
+    kCreateProfile = 4,
+    kGetRuntimeConfigYaml = 5,
+    /** Request: uint32 arm_index. Response: effective arm safety YAML. */
+    kGetArmEffectiveYaml = 6,
+    /** Request: uint32 arm_index + YAML safety overlay. Response empty on success. */
+    kSetArmSafetyYaml = 7,
 };
 
 enum class LogMethod : std::uint32_t {
@@ -72,6 +92,16 @@ enum class RtConfigType : std::uint32_t {
     kTelemetryEnabled = 4,
     /** values[0]: sample_every_n >= 1 */
     kTelemetrySampleEveryN = 5,
+    /** values[0]: heartbeat_timeout_ms > 0 */
+    kHeartbeatTimeoutMs = 6,
+    /** values[0]: arm_failed_threshold >= 1 */
+    kArmFailedThreshold = 7,
+    /** values[0]: gripper_failed_threshold >= 1 */
+    kGripperFailedThreshold = 8,
+    /** values[0]: button_failed_threshold >= 1 */
+    kButtonFailedThreshold = 9,
+    /** values[0]: joint_follow_threshold >= 1 */
+    kJointFollowThreshold = 10,
 };
 
 struct FileEntry {

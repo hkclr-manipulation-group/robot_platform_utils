@@ -599,6 +599,28 @@ TcpDataClient::Result TcpDataClient::resetEncoderLastPosition(int timeout_usec) 
                    static_cast<std::uint32_t>(tcp_data::SystemMethod::kResetEncoderLastPosition), {}, timeout_usec);
 }
 
+TcpDataClient::Result TcpDataClient::getArmSerialNumber(std::string& out_serial, int timeout_usec) {
+    Result rpc = callRpc(tcp_data::ServiceId::kSystem,
+                         static_cast<std::uint32_t>(tcp_data::SystemMethod::kGetArmSerialNumber), {}, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), out_serial)) {
+        return Result{false, "TcpDataClient: failed to decode arm serial number response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::setArmSerialNumber(const std::string& serial, int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    if (!tcp_data::encodeNameRequest(serial, request_body)) {
+        return Result{false, "TcpDataClient: failed to encode arm serial number request", 0};
+    }
+    return callRpc(tcp_data::ServiceId::kSystem,
+                   static_cast<std::uint32_t>(tcp_data::SystemMethod::kSetArmSerialNumber), request_body,
+                   timeout_usec);
+}
+
 TcpDataClient::Result TcpDataClient::callNetworkConfig(tcp_data::NetworkMethod method,
                                                        const std::vector<std::uint8_t>& request_body,
                                                        tcp_data::NetworkConfigData& response, int timeout_usec) {
