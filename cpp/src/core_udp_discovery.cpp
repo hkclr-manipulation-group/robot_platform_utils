@@ -42,6 +42,8 @@ namespace {
 struct LocalIpv4Network {
     std::string host_ip;
     std::string broadcast_ip;
+    std::string network_ip;
+    uint32_t prefix_len = 32;
 };
 
 struct DiscoveryTarget {
@@ -54,6 +56,21 @@ std::atomic<uint32_t> g_next_discovery_handshake_seq{1};
 
 uint32_t nextDiscoveryHandshakeSequenceId() {
     return g_next_discovery_handshake_seq.fetch_add(1, std::memory_order_relaxed);
+}
+
+/**
+ * Advance the discovery sequence by `jump` and return the new value.
+ *
+ * Servers reject handshakes whose sequence is not strictly newer than the
+ * last sequence seen for the client (anti-replay), and that state outlives
+ * SDK process restarts for as long as the server keeps the session. A fresh
+ * process restarts at 1, so after any session that pushed the server's
+ * counter past the resync budget a +1 climb can never catch up. The server
+ * accepts anything within (last, last + 2^31), so jumping forward
+ * exponentially lands inside the acceptance window after a few rejections.
+ */
+uint32_t jumpDiscoveryHandshakeSequenceId(uint32_t jump) {
+    return g_next_discovery_handshake_seq.fetch_add(jump, std::memory_order_relaxed) + jump;
 }
 
 bool isStaleDiscoveryHandshakeResponse(
@@ -196,6 +213,30 @@ std::string broadcastFromHostAndPrefix(const in_addr& host, uint32_t prefix_len)
     return ipv4ToString(bcast);
 }
 
+std::string networkFromHostAndPrefix(const in_addr& host, uint32_t prefix_len) {
+    if (prefix_len > 32) {
+        return {};
+    }
+    const uint32_t host_be = ntohl(host.s_addr);
+    const uint32_t mask = prefix_len == 0 ? 0u : (~0u << (32 - prefix_len));
+    in_addr net{};
+    net.s_addr = htonl(host_be & mask);
+    return ipv4ToString(net);
+}
+
+uint32_t prefixLenFromNetmask(const in_addr& netmask) {
+    const uint32_t mask_be = ntohl(netmask.s_addr);
+    uint32_t prefix_len = 0;
+    for (uint32_t bit = 0; bit < 32; ++bit) {
+        if ((mask_be & (1u << (31 - bit))) != 0) {
+            prefix_len++;
+        } else {
+            break;
+        }
+    }
+    return prefix_len;
+}
+
 std::vector<LocalIpv4Network> collectLocalIpv4Networks() {
     std::vector<LocalIpv4Network> networks;
 
@@ -238,12 +279,15 @@ std::vector<LocalIpv4Network> collectLocalIpv4Networks() {
             if (host_ip.empty() || host_ip == "0.0.0.0") {
                 continue;
             }
+            const uint32_t prefix_len = unicast->OnLinkPrefixLength;
             const std::string broadcast_ip = broadcastFromHostAndPrefix(
-                sin->sin_addr, unicast->OnLinkPrefixLength);
+                sin->sin_addr, prefix_len);
             if (broadcast_ip.empty()) {
                 continue;
             }
-            networks.push_back({host_ip, broadcast_ip});
+            networks.push_back({host_ip, broadcast_ip,
+                                networkFromHostAndPrefix(sin->sin_addr, prefix_len),
+                                prefix_len});
         }
     }
 #else
@@ -265,29 +309,26 @@ std::vector<LocalIpv4Network> collectLocalIpv4Networks() {
             continue;
         }
 
+        uint32_t prefix_len = 32;
+        if (ifa->ifa_netmask && ifa->ifa_netmask->sa_family == AF_INET) {
+            const auto* nmask = reinterpret_cast<const sockaddr_in*>(ifa->ifa_netmask);
+            prefix_len = prefixLenFromNetmask(nmask->sin_addr);
+        }
+
         std::string broadcast_ip;
         if (ifa->ifa_broadaddr && ifa->ifa_broadaddr->sa_family == AF_INET) {
             const auto* bsin = reinterpret_cast<const sockaddr_in*>(ifa->ifa_broadaddr);
             broadcast_ip = ipv4ToString(bsin->sin_addr);
         }
-        if (broadcast_ip.empty() && ifa->ifa_netmask
-            && ifa->ifa_netmask->sa_family == AF_INET) {
-            const auto* nmask = reinterpret_cast<const sockaddr_in*>(ifa->ifa_netmask);
-            uint32_t prefix_len = 0;
-            const uint32_t mask_be = ntohl(nmask->sin_addr.s_addr);
-            for (uint32_t bit = 0; bit < 32; ++bit) {
-                if ((mask_be & (1u << (31 - bit))) != 0) {
-                    prefix_len++;
-                } else {
-                    break;
-                }
-            }
+        if (broadcast_ip.empty()) {
             broadcast_ip = broadcastFromHostAndPrefix(sin->sin_addr, prefix_len);
         }
         if (broadcast_ip.empty()) {
             continue;
         }
-        networks.push_back({host_ip, broadcast_ip});
+        networks.push_back({host_ip, broadcast_ip,
+                            networkFromHostAndPrefix(sin->sin_addr, prefix_len),
+                            prefix_len});
     }
     freeifaddrs(ifap);
 #endif
@@ -297,7 +338,8 @@ std::vector<LocalIpv4Network> collectLocalIpv4Networks() {
 
 std::vector<DiscoveryTarget> buildDiscoveryTargets(
     const std::vector<std::string>& probe_ips,
-    bool expand_local_broadcasts) {
+    bool expand_local_broadcasts,
+    bool include_subnet_sweep = false) {
     std::vector<DiscoveryTarget> targets;
     std::unordered_set<std::string> seen;
 
@@ -330,11 +372,51 @@ std::vector<DiscoveryTarget> buildDiscoveryTargets(
         }
         addTarget(probe_ip);
     }
-
     if (expand_local_broadcasts) {
         for (const LocalIpv4Network& net : local_networks) {
             if (net.broadcast_ip != "255.255.255.255") {
                 addTarget(net.broadcast_ip);
+            }
+        }
+    }
+
+    // Unicast sweep of small local subnets. Many WiFi networks (hotspots,
+    // APs with client isolation / multicast filtering) never deliver
+    // broadcast or multicast frames, while unicast still works — that is why
+    // direct-IP connect keeps working when discovery does not. Sweeping the
+    // subnet with unicast handshakes finds servers on such networks.
+    // Only subnets with at most a /24 worth of hosts are swept so the burst
+    // stays bounded.
+    if (include_subnet_sweep) {
+        for (const LocalIpv4Network& net : local_networks) {
+            if (net.host_ip.empty() || net.host_ip == "127.0.0.1") {
+                continue;
+            }
+            uint32_t sweep_prefix = net.prefix_len;
+            // WiFi interfaces often report /32 when the OS lacks a netmask;
+            // fall back to a typical /24 LAN so sweep still runs.
+            if (sweep_prefix > 30 || sweep_prefix < 24) {
+                if (sweep_prefix == 32) {
+                    sweep_prefix = 24;
+                } else {
+                    continue;
+                }
+            }
+            in_addr host_addr{};
+            if (inet_pton(AF_INET, net.host_ip.c_str(), &host_addr) != 1) {
+                continue;
+            }
+            const uint32_t host_be = ntohl(host_addr.s_addr);
+            const uint32_t mask = ~0u << (32 - sweep_prefix);
+            const uint32_t first_be = host_be & mask;
+            const uint32_t last_be = first_be | ~mask;
+            for (uint32_t ip_be = first_be; ip_be < last_be; ++ip_be) {
+                if (ip_be == first_be || ip_be == last_be || ip_be == host_be) {
+                    continue;  // skip network, broadcast, and our own address
+                }
+                in_addr addr{};
+                addr.s_addr = htonl(ip_be);
+                addTarget(ipv4ToString(addr));
             }
         }
     }
@@ -412,11 +494,27 @@ bool isProbeResponseAllowed(
     const std::string& peer_ip,
     const std::vector<std::string>& probe_ips,
     bool expand_local_broadcasts) {
-    if (expand_local_broadcasts) {
-        return true;
-    }
+    bool broadcast_style_probe = false;
     for (const std::string& probe_ip : probe_ips) {
         if (peer_ip == probe_ip) {
+            return true;
+        }
+        if (isMulticastIp(probe_ip) || isLimitedBroadcast(probe_ip)) {
+            broadcast_style_probe = true;
+        }
+    }
+    // A broadcast/multicast probe may legitimately be answered by any host on
+    // the network. A unicast probe (direct-IP connect) must only be answered
+    // by its target — otherwise connect("A") can silently land on server B.
+    return expand_local_broadcasts && broadcast_style_probe;
+}
+
+/** True when the probe list targets the network at large (multicast or
+ *  limited broadcast) rather than a specific server. Only then does a
+ *  subnet unicast sweep make sense. */
+bool probeListIncludesBroadcastStyleTarget(const std::vector<std::string>& probe_ips) {
+    for (const std::string& probe_ip : probe_ips) {
+        if (isMulticastIp(probe_ip) || isLimitedBroadcast(probe_ip)) {
             return true;
         }
     }
@@ -447,11 +545,13 @@ DiscoveredServer discoverRtServerViaHandshake(
         max_attempts_per_probe = 1;
     }
 
-    const std::vector<DiscoveryTarget> targets =
+    const bool can_sweep = probeListIncludesBroadcastStyleTarget(probe_ips);
+    std::vector<DiscoveryTarget> targets =
         buildDiscoveryTargets(probe_ips, expand_local_broadcasts);
     if (targets.empty()) {
         throw std::invalid_argument("discoverRtServerViaHandshake: no discovery targets");
     }
+    bool sweep_expanded = false;
 
     const std::size_t send_buffer_size =
         sizeof(CoreRequestVariant) + HMAC_KEY_SIZE;
@@ -480,6 +580,7 @@ DiscoveredServer discoverRtServerViaHandshake(
     handshake.client_id = client_id;
     uint32_t sequence_id = nextDiscoveryHandshakeSequenceId();
     int sequence_resync_remaining = 16;
+    uint32_t sequence_jump = 1024;
     handshake.telemetry_port = telemetry_port;
 
     std::ostringstream tried;
@@ -504,6 +605,15 @@ DiscoveredServer discoverRtServerViaHandshake(
         if (n <= 0) {
             std::cout << "discoverRtServerViaHandshake: attempt " << attempt
                       << "/" << max_attempts_per_probe << " timed out\n";
+            if (!sweep_expanded && can_sweep) {
+                // Broadcast/multicast went unanswered (common on WiFi APs that
+                // filter them) — widen with a unicast sweep of local subnets.
+                targets = buildDiscoveryTargets(
+                    probe_ips, expand_local_broadcasts, /*include_subnet_sweep=*/true);
+                sweep_expanded = true;
+                std::cout << "discoverRtServerViaHandshake: expanding to unicast subnet sweep ("
+                          << targets.size() << " targets)\n";
+            }
             continue;
         }
 
@@ -527,7 +637,11 @@ DiscoveredServer discoverRtServerViaHandshake(
                     "discoverRtServerViaHandshake: server rejected handshake ("
                     + enumToString(res.payload.status) + ")");
             }
-            sequence_id = nextDiscoveryHandshakeSequenceId();
+            sequence_id = jumpDiscoveryHandshakeSequenceId(sequence_jump);
+            sequence_jump *= 2;
+            if (sequence_jump > (1u << 20)) {
+                sequence_jump = 1u << 20;
+            }
             --attempt;
             continue;
         }
@@ -590,10 +704,12 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
         max_attempts_per_probe = 1;
     }
 
-    const std::vector<DiscoveryTarget> targets = buildDiscoveryTargets(probe_ips, true);
+    const bool can_sweep = probeListIncludesBroadcastStyleTarget(probe_ips);
+    std::vector<DiscoveryTarget> targets = buildDiscoveryTargets(probe_ips, true);
     if (targets.empty()) {
         return {};
     }
+    bool sweep_expanded = false;
 
     const std::size_t send_buffer_size =
         sizeof(CoreRequestVariant) + HMAC_KEY_SIZE;
@@ -621,6 +737,7 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     std::unordered_map<std::string, DiscoveredServer> by_ip;
     uint32_t sequence_id = nextDiscoveryHandshakeSequenceId();
     int sequence_resync_remaining = 16;
+    uint32_t sequence_jump = 1024;
 
     for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
         SdkHandshakeReq handshake{};
@@ -712,8 +829,22 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
         if (!by_ip.empty()) {
             break;
         }
+        if (!sweep_expanded && can_sweep) {
+            // Broadcast/multicast went unanswered (common on WiFi APs that
+            // filter them) — widen with a unicast sweep of local subnets.
+            targets = buildDiscoveryTargets(
+                probe_ips, /*expand_local_broadcasts=*/true,
+                /*include_subnet_sweep=*/true);
+            sweep_expanded = true;
+            std::cout << "discoverAllRtServersViaHandshake: expanding to unicast subnet sweep ("
+                      << targets.size() << " targets)\n";
+        }
         if (saw_sequence_rejection && sequence_resync_remaining-- > 0) {
-            sequence_id = nextDiscoveryHandshakeSequenceId();
+            sequence_id = jumpDiscoveryHandshakeSequenceId(sequence_jump);
+            sequence_jump *= 2;
+            if (sequence_jump > (1u << 20)) {
+                sequence_jump = 1u << 20;
+            }
             --attempt;
         } else {
             sequence_id = nextDiscoveryHandshakeSequenceId();

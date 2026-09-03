@@ -25,6 +25,15 @@ struct DiscoveredServer {
  * 255.255.255.255 — Linux does not loop limited-broadcast back to local sockets, so
  * same-host panel+RT discovery fails with global broadcast.
  *
+ * When the probe list targets the network at large (multicast / 255.255.255.255)
+ * and an attempt gets no reply, later attempts are widened with a unicast sweep
+ * of small local subnets: many WiFi networks drop broadcast/multicast frames
+ * while unicast still gets through (direct-IP connect keeps working there).
+ *
+ * Handshake sequence rejections from the server's anti-replay check (state that
+ * outlives client restarts) are recovered by jumping the sequence forward
+ * exponentially instead of retrying with +1.
+ *
  * @param client_id         Panel / SDK client id (HMAC + session bookkeeping).
  * @param core_request_port Destination UDP port (same as CoreUdpServer local_port).
  * @param telemetry_port    Telemetry UDP port (same as CoreUdpServer telemetry port).
@@ -64,7 +73,9 @@ inline DiscoveredServer discoverRtServerViaHandshake(
 /**
  * Enumerate all RT servers that reply to SdkHandshakeReq.
  * Collects unique peer IPs across probe targets within each wait window.
- * Returns an empty vector when none respond (does not throw for "not found").
+ * When broadcast/multicast probes go unanswered, later attempts add a unicast
+ * sweep of local /24-/30 subnets (WiFi APs often block broadcast but allow
+ * direct unicast). Returns an empty vector when none respond (does not throw).
  */
 std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     uint16_t client_id,
