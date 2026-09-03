@@ -61,11 +61,11 @@ enum class RuntimeSettingsMethod : std::uint32_t {
     kListProfiles = 2,
     kActivateProfile = 3,
     kCreateProfile = 4,
-    kGetRuntimeConfigYaml = 5,
-    /** Request: uint32 arm_index. Response: effective arm safety YAML. */
-    kGetArmEffectiveYaml = 6,
-    /** Request: uint32 arm_index + YAML safety overlay. Response empty on success. */
-    kSetArmSafetyYaml = 7,
+    kGetRuntimeConfigJson = 5,
+    /** Request: uint32 arm_index. Response: effective arm settings JSON. */
+    kGetArmEffectiveJson = 6,
+    /** Request: uint32 arm_index + JSON safety overlay. Response empty on success. */
+    kSetArmSafetyJson = 7,
 };
 
 enum class LogMethod : std::uint32_t {
