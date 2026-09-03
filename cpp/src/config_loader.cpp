@@ -390,13 +390,47 @@ void printYamlNode(const YAML::Node& node) {
     printYamlNode(node, 0, "");
 }
 
+bool sequenceContainsOnlyScalars(const YAML::Node& node) {
+    if (!node.IsSequence() || node.size() == 0) {
+        return false;
+    }
+    for (const YAML::Node& item : node) {
+        if (!item.IsScalar()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void setLeafSequencesFlowStyle(YAML::Node node) {
+    if (node.IsSequence()) {
+        if (sequenceContainsOnlyScalars(node)) {
+            node.SetStyle(YAML::EmitterStyle::Flow);
+            return;
+        }
+        node.SetStyle(YAML::EmitterStyle::Block);
+        for (YAML::Node item : node) {
+            setLeafSequencesFlowStyle(item);
+        }
+        return;
+    }
+    if (node.IsMap()) {
+        node.SetStyle(YAML::EmitterStyle::Block);
+        for (YAML::const_iterator it = node.begin(); it != node.end(); ++it) {
+            setLeafSequencesFlowStyle(YAML::Node(it->second));
+        }
+    }
+}
+
 bool writeYamlNode(const YAML::Node& node, const std::string& write_path) {
     try {
         std::ofstream fout(write_path);
         if (!fout.is_open()) {
             return false;
         }
-        fout << node;
+        YAML::Node styled = YAML::Clone(node);
+        setLeafSequencesFlowStyle(styled);
+        fout << styled;
         fout.close();
         return true;
     } catch (const std::exception&) {
