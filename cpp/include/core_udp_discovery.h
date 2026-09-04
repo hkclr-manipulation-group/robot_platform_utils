@@ -73,9 +73,11 @@ inline DiscoveredServer discoverRtServerViaHandshake(
 /**
  * Enumerate all RT servers that reply to SdkHandshakeReq.
  * Collects unique peer IPs across probe targets within each wait window.
- * When broadcast/multicast probes go unanswered, later attempts add a unicast
- * sweep of local /24-/30 subnets (WiFi APs often block broadcast but allow
- * direct unicast). Returns an empty vector when none respond (does not throw).
+ * On the same LAN, stops listening shortly (~300 ms) after the last reply
+ * instead of waiting out the full timeout. When broadcast/multicast probes go
+ * unanswered, later attempts add a unicast sweep of local /24-/30 subnets
+ * (WiFi APs often block broadcast but allow direct unicast). Returns an empty
+ * vector when none respond (does not throw).
  */
 std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     uint16_t client_id,
