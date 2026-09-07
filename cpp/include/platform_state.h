@@ -357,7 +357,7 @@ namespace robot::platform {
 
     struct SinglePointTarget{
         float               interpolation_t; // Minimum interpolation time, t >= 0. May be extended based on interpolation_speed_ratio.
-        float               interpolation_speed_ratio; // Ratio of soft joint limit, range [0, 1]
+        float               interpolation_speed_ratio; // Ratio of soft joint limit, range (0, 1]. 0 keeps current ratio.
 
         float               gripper_joint[MAX_GRIPPER_SIZE][MAX_GRIPPER_JOINT_SIZE];
 
