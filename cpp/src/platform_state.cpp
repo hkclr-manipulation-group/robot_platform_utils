@@ -594,8 +594,9 @@ namespace robot::platform {
 
             case CommandResponseStatus::kRejectedBlocked:
                 title = "Access Denied";
-                message = "Another client with higher priority or same priority is currently controlling the robot.\n"
-                        "Please wait for the other client to release control, or try again.";
+                message = "Robot is occupied by another client.\n"
+                        "Please wait for the other client (e.g. Panel) to release control, "
+                        "or disconnect that client first, then retry connect.";
                 break;
 
             case CommandResponseStatus::kRejectedConfigNotReady:

@@ -526,6 +526,16 @@ bool isLoopbackIp(const std::string& ip) {
     return ip == "127.0.0.1";
 }
 
+bool isExplicitLoopbackProbe(const std::vector<std::string>& probe_ips) {
+    return probe_ips.size() == 1 && probe_ips[0] == "127.0.0.1";
+}
+
+bool shouldIgnoreLoopbackDiscoveryReply(
+    const std::string& server_ip,
+    const std::vector<std::string>& probe_ips) {
+    return isLoopbackIp(server_ip) && !isExplicitLoopbackProbe(probe_ips);
+}
+
 bool onlyLoopbackDiscovered(
     const std::unordered_map<std::string, DiscoveredServer>& by_ip) {
     if (by_ip.empty()) {
@@ -904,6 +914,9 @@ DiscoveredServer discoverRtServerViaHandshake(
         }
         fillDiscoveredServerFromHandshake(
             out, res, handshake.sequence_id, sanitizeTimeSyncOffset(sync.offset_us), sync.rtt_us);
+        if (shouldIgnoreLoopbackDiscoveryReply(out.server_ip, probe_ips)) {
+            continue;
+        }
         if (isMulticastIp(out.server_ip) || isLimitedBroadcast(out.server_ip)) {
             std::cout << "discoverRtServerViaHandshake: warning: peer address "
                       << out.server_ip << " is not unicast\n";
@@ -1041,6 +1054,9 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     std::vector<DiscoveredServer> out;
     out.reserve(by_ip.size());
     for (auto& entry : by_ip) {
+        if (isLoopbackIp(entry.first)) {
+            continue;
+        }
         out.push_back(std::move(entry.second));
     }
     return out;
