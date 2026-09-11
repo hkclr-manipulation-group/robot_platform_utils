@@ -459,14 +459,14 @@ namespace robot::platform {
                 uint8_t             enable_joint[MAX_ARM_JOINT_SIZE];
 
                 PositionTarget      tool_offset;
-                float               soft_limit_position[MAX_ARM_JOINT_SIZE][2];
-                float               soft_limit_velocity[MAX_ARM_JOINT_SIZE];
-                float               soft_limit_torque[MAX_ARM_JOINT_SIZE];
+                float               soft_limit_position[MAX_ARM_JOINT_SIZE][2];  // rad
+                float               soft_limit_velocity[MAX_ARM_JOINT_SIZE];     // rad/s
+                float               soft_limit_torque[MAX_ARM_JOINT_SIZE];       // N·m
             }arm[MAX_ARM_SIZE];
 
             struct {
                 ControlType         target_type;
-                float               soft_limit_position[MAX_GRIPPER_JOINT_SIZE][2];
+                float               soft_limit_position[MAX_GRIPPER_JOINT_SIZE][2];  // rad
             }gripper[MAX_GRIPPER_SIZE];
         }payload;
 
@@ -503,9 +503,9 @@ namespace robot::platform {
 
                 PositionTarget      tool_offset;
                 uint8_t             enabled_joint[MAX_ARM_JOINT_SIZE];
-                float               soft_limit_position[MAX_ARM_JOINT_SIZE][2];
-                float               soft_limit_velocity[MAX_ARM_JOINT_SIZE];
-                float               soft_limit_torque[MAX_ARM_JOINT_SIZE];
+                float               soft_limit_position[MAX_ARM_JOINT_SIZE][2];  // rad
+                float               soft_limit_velocity[MAX_ARM_JOINT_SIZE];     // rad/s
+                float               soft_limit_torque[MAX_ARM_JOINT_SIZE];       // N·m
                 
                 float               hard_limit_position[MAX_ARM_JOINT_SIZE][2];
                 float               hard_limit_velocity[MAX_ARM_JOINT_SIZE];
@@ -523,7 +523,7 @@ namespace robot::platform {
             struct {
                 char                name[MAX_NAME_SIZE];
                 ControlType         target_type;
-                float               soft_limit_position[MAX_GRIPPER_JOINT_SIZE][2];
+                float               soft_limit_position[MAX_GRIPPER_JOINT_SIZE][2];  // rad
                 float               hard_limit_position[MAX_GRIPPER_JOINT_SIZE][2];
             }gripper[MAX_GRIPPER_SIZE];
         }payload;
