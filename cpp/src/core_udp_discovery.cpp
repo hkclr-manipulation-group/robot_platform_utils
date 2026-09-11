@@ -588,15 +588,23 @@ bool shouldExpandToSubnetSweep(
     bool can_sweep,
     bool sweep_expanded,
     int attempt,
-    int max_attempts,
-    const std::unordered_map<std::string, DiscoveredServer>& by_ip) {
-    if (!can_sweep || sweep_expanded) {
+    const std::unordered_map<std::string, DiscoveredServer>& by_ip,
+    const DiscoveryListenState& prev_listen_state) {
+    if (!can_sweep || sweep_expanded || attempt <= 1) {
         return false;
+    }
+    if (!by_ip.empty() && !onlyLoopbackDiscovered(by_ip)) {
+        return false;
+    }
+    // After the first broadcast/multicast attempt, widen to unicast subnet sweep
+    // when no LAN robot was found (matches discoverRtServerViaHandshake timeout path).
+    if (by_ip.empty() && !prev_listen_state.have_any_reply) {
+        return true;
     }
     if (onlyLoopbackDiscovered(by_ip)) {
         return true;
     }
-    return by_ip.empty() && attempt >= max_attempts;
+    return prev_listen_state.have_any_reply && !prev_listen_state.have_lan_reply;
 }
 
 void listenForDiscoveryRepliesUntil(
@@ -683,14 +691,17 @@ void listenForDiscoveryRepliesUntil(
         if (isMulticastIp(found.server_ip) || isLimitedBroadcast(found.server_ip)) {
             continue;
         }
+        state.last_valid_reply_at = std::chrono::steady_clock::now();
+        state.have_any_reply = true;
+        if (isLoopbackIp(found.server_ip)) {
+            std::cout << "discoverAllRtServersViaHandshake: ignoring loopback reply from "
+                      << "local rt_control (robot_name=" << found.robot_name << ")\n";
+            continue;
+        }
+        state.have_lan_reply = true;
         std::cout << "discoverAllRtServersViaHandshake: reply from "
                   << found.server_ip << " robot_name=" << found.robot_name
                   << " rtt_us=" << found.handshake_rtt_us << "\n";
-        state.last_valid_reply_at = std::chrono::steady_clock::now();
-        state.have_any_reply = true;
-        if (!isLoopbackIp(found.server_ip)) {
-            state.have_lan_reply = true;
-        }
         auto existing = by_ip.find(found.server_ip);
         if (existing == by_ip.end()) {
             by_ip.emplace(found.server_ip, found);
@@ -987,10 +998,11 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     uint32_t sequence_id = nextDiscoveryHandshakeSequenceId();
     int sequence_resync_remaining = 16;
     uint32_t sequence_jump = 1024;
+    DiscoveryListenState prev_listen_state;
 
     for (int attempt = 1; attempt <= max_attempts_per_probe; ++attempt) {
         if (shouldExpandToSubnetSweep(
-                can_sweep, sweep_expanded, attempt, max_attempts_per_probe, by_ip)) {
+                can_sweep, sweep_expanded, attempt, by_ip, prev_listen_state)) {
             targets = buildDiscoveryTargets(
                 probe_ips, /*expand_local_broadcasts=*/true,
                 /*include_subnet_sweep=*/true);
@@ -1030,15 +1042,15 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
                       << " got no reply\n";
         }
 
-        if (!by_ip.empty()) {
-            // A loopback-only hit before subnet sweep is often a stale local
-            // rt_control — keep sweeping for the LAN robot on WiFi.
-            if (!onlyLoopbackDiscovered(by_ip) || sweep_expanded || !can_sweep) {
-                break;
-            }
+        if (listen_state.have_lan_reply || (!by_ip.empty() && !onlyLoopbackDiscovered(by_ip))) {
+            break;
+        }
+        if (listen_state.have_any_reply && !listen_state.have_lan_reply && can_sweep
+            && !sweep_expanded) {
             std::cout << "discoverAllRtServersViaHandshake: only loopback replied; "
                       << "continuing LAN subnet sweep\n";
         }
+        prev_listen_state = listen_state;
         if (listen_state.saw_sequence_rejection && sequence_resync_remaining-- > 0) {
             sequence_id = jumpDiscoveryHandshakeSequenceId(sequence_jump);
             sequence_jump *= 2;
