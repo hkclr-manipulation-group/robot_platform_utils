@@ -1,4 +1,4 @@
-#include "tcp_data_services.h"
+#include "tcp_data_codec.h"
 
 #include "tcp_data_protocol.h"
 
@@ -428,6 +428,48 @@ bool decodeRpcResponse(const std::uint8_t* data, std::size_t size, std::uint32_t
     body = data + offset;
     body_size = size - offset;
     return true;
+}
+
+bool encodeRpcCapabilitiesBody(const std::vector<RpcServiceCapability>& services, std::vector<std::uint8_t>& out) {
+    out.clear();
+    writeU32(out, static_cast<std::uint32_t>(services.size()));
+    for (const RpcServiceCapability& service : services) {
+        writeU32(out, service.service_id);
+        writeU32(out, static_cast<std::uint32_t>(service.method_ids.size()));
+        for (std::uint32_t method_id : service.method_ids) {
+            writeU32(out, method_id);
+        }
+    }
+    return true;
+}
+
+bool decodeRpcCapabilitiesBody(const std::uint8_t* data, std::size_t size,
+                               std::vector<RpcServiceCapability>& services) {
+    services.clear();
+    std::size_t offset = 0;
+    std::uint32_t service_count = 0;
+    if (!readU32(data, size, offset, service_count)) {
+        return false;
+    }
+    services.reserve(service_count);
+    for (std::uint32_t service_i = 0; service_i < service_count; ++service_i) {
+        RpcServiceCapability entry;
+        std::uint32_t method_count = 0;
+        if (!readU32(data, size, offset, entry.service_id)
+            || !readU32(data, size, offset, method_count)) {
+            return false;
+        }
+        entry.method_ids.reserve(method_count);
+        for (std::uint32_t method_i = 0; method_i < method_count; ++method_i) {
+            std::uint32_t method_id = 0;
+            if (!readU32(data, size, offset, method_id)) {
+                return false;
+            }
+            entry.method_ids.push_back(method_id);
+        }
+        services.push_back(std::move(entry));
+    }
+    return offset == size;
 }
 
 }  // namespace robot::platform::tcp_data

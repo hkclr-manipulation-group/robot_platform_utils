@@ -621,6 +621,99 @@ TcpDataClient::Result TcpDataClient::setArmSerialNumber(const std::string& seria
                    timeout_usec);
 }
 
+TcpDataClient::Result TcpDataClient::flushRuntimeConfig(int timeout_usec) {
+    return callRpc(tcp_data::ServiceId::kSystem,
+                   static_cast<std::uint32_t>(tcp_data::SystemMethod::kFlushRuntimeConfig), {}, timeout_usec);
+}
+
+TcpDataClient::Result TcpDataClient::flushRuntimeSettings(int timeout_usec) {
+    return callRpc(tcp_data::ServiceId::kRuntimeSettings,
+                   static_cast<std::uint32_t>(tcp_data::RuntimeSettingsMethod::kFlush), {}, timeout_usec);
+}
+
+TcpDataClient::Result TcpDataClient::listRuntimeProfiles(std::string& profiles_json, int timeout_usec) {
+    Result rpc = callRpc(tcp_data::ServiceId::kRuntimeSettings,
+                         static_cast<std::uint32_t>(tcp_data::RuntimeSettingsMethod::kListProfiles), {},
+                         timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), profiles_json)) {
+        return Result{false, "TcpDataClient: failed to decode runtime profiles response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::activateRuntimeProfile(const std::string& profile_id, int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    if (!tcp_data::encodeNameRequest(profile_id, request_body)) {
+        return Result{false, "TcpDataClient: failed to encode activate profile request", 0};
+    }
+    return callRpc(tcp_data::ServiceId::kRuntimeSettings,
+                   static_cast<std::uint32_t>(tcp_data::RuntimeSettingsMethod::kActivateProfile), request_body,
+                   timeout_usec);
+}
+
+TcpDataClient::Result TcpDataClient::createRuntimeProfile(const std::string& name, std::string& profile_id,
+                                                          int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    if (!tcp_data::encodeNameRequest(name, request_body)) {
+        return Result{false, "TcpDataClient: failed to encode create profile request", 0};
+    }
+    Result rpc = callRpc(tcp_data::ServiceId::kRuntimeSettings,
+                         static_cast<std::uint32_t>(tcp_data::RuntimeSettingsMethod::kCreateProfile), request_body,
+                         timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), profile_id)) {
+        return Result{false, "TcpDataClient: failed to decode create profile response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::getRuntimeConfigJson(std::string& json, int timeout_usec) {
+    Result rpc = callRpc(tcp_data::ServiceId::kRuntimeSettings,
+                         static_cast<std::uint32_t>(tcp_data::RuntimeSettingsMethod::kGetRuntimeConfigJson), {},
+                         timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), json)) {
+        return Result{false, "TcpDataClient: failed to decode runtime config json response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::getArmEffectiveSettingsJson(std::uint32_t arm_index, std::string& json,
+                                                                 int timeout_usec) {
+    std::vector<std::uint8_t> request_body(sizeof(std::uint32_t));
+    std::memcpy(request_body.data(), &arm_index, sizeof(std::uint32_t));
+    Result rpc = callRpc(tcp_data::ServiceId::kRuntimeSettings,
+                         static_cast<std::uint32_t>(tcp_data::RuntimeSettingsMethod::kGetArmEffectiveJson),
+                         request_body, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), json)) {
+        return Result{false, "TcpDataClient: failed to decode arm effective settings response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::setArmSafetySettingsJson(std::uint32_t arm_index, const std::string& json,
+                                                              int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    request_body.resize(sizeof(std::uint32_t) + json.size());
+    std::memcpy(request_body.data(), &arm_index, sizeof(std::uint32_t));
+    if (!json.empty()) {
+        std::memcpy(request_body.data() + sizeof(std::uint32_t), json.data(), json.size());
+    }
+    return callRpc(tcp_data::ServiceId::kRuntimeSettings,
+                   static_cast<std::uint32_t>(tcp_data::RuntimeSettingsMethod::kSetArmSafetyJson), request_body,
+                   timeout_usec);
+}
+
 TcpDataClient::Result TcpDataClient::callNetworkConfig(tcp_data::NetworkMethod method,
                                                        const std::vector<std::uint8_t>& request_body,
                                                        tcp_data::NetworkConfigData& response, int timeout_usec) {

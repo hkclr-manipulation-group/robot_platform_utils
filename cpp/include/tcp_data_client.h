@@ -91,7 +91,7 @@ public:
     Result setConfig(tcp_data::RtConfigType type, const std::vector<std::int32_t>& values,
                      tcp_data::ConfigValuePayload& result, int timeout_usec = kDefaultTimeoutUsec);
 
-    /** Re-baseline encoder_last_position.bin (Recovery + pending baseline confirmation only). */
+    /** Re-baseline encoder_last_position.bin (requires Recovery system state). */
     Result resetEncoderLastPosition(int timeout_usec = kDefaultTimeoutUsec);
 
     /** Read persisted arm serial number (empty string when unset). */
@@ -99,6 +99,26 @@ public:
 
     /** Persist arm serial number (non-empty, max 64 chars). */
     Result setArmSerialNumber(const std::string& serial, int timeout_usec = kDefaultTimeoutUsec);
+
+    /** Persist current runtime settings to disk (System::FlushRuntimeConfig). */
+    Result flushRuntimeConfig(int timeout_usec = kDefaultTimeoutUsec);
+
+    Result flushRuntimeSettings(int timeout_usec = kDefaultTimeoutUsec);
+
+    Result listRuntimeProfiles(std::string& profiles_json, int timeout_usec = kDefaultTimeoutUsec);
+
+    Result activateRuntimeProfile(const std::string& profile_id, int timeout_usec = kDefaultTimeoutUsec);
+
+    Result createRuntimeProfile(const std::string& name, std::string& profile_id,
+                              int timeout_usec = kDefaultTimeoutUsec);
+
+    Result getRuntimeConfigJson(std::string& json, int timeout_usec = kDefaultTimeoutUsec);
+
+    Result getArmEffectiveSettingsJson(std::uint32_t arm_index, std::string& json,
+                                       int timeout_usec = kDefaultTimeoutUsec);
+
+    Result setArmSafetySettingsJson(std::uint32_t arm_index, const std::string& json,
+                                    int timeout_usec = kDefaultTimeoutUsec);
 
     void close();
 
