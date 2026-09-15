@@ -80,6 +80,9 @@ void CuarmMessageHandler::pack_panel_command(PanelCommand* panel, char* send_buf
         for (int i = 0; i < panel->GripperJointSize[gri_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%e#", panel->GripperJointCmd[gri_i][i]);
         }
+        sprintf(&(send_buffer[strlen(send_buffer)]), "%hu#", panel->GripperSpeed[gri_i]);
+        sprintf(&(send_buffer[strlen(send_buffer)]), "%hu#", panel->GripperForce[gri_i]);
+        sprintf(&(send_buffer[strlen(send_buffer)]), "%u#", panel->GripperCommandId[gri_i]);
     }
 
     //Config setting
@@ -171,6 +174,9 @@ void CuarmMessageHandler::unpack_panel_command(PanelCommand* panel, char* receiv
         for (int i = 0; i < panel->GripperJointSize[gri_i]; ++ i) {
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(panel->GripperJointCmd[gri_i][i]));
         }
+        sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hu#", &(panel->GripperSpeed[gri_i]));
+        sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hu#", &(panel->GripperForce[gri_i]));
+        sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%u#", &(panel->GripperCommandId[gri_i]));
     }
 
     //Config setting
@@ -399,6 +405,10 @@ void CuarmMessageHandler::unpack_planner_state(PlannerState* state, char* receiv
         for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%e#", &(state->GripperJointPos[gri_i][i]));
         }
+        sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hu#", &(state->GripperSpeed[gri_i]));
+        sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hu#", &(state->GripperForce[gri_i]));
+        sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%u#", &(state->GripperCommandId[gri_i]));
+        sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%hhu#", &(state->GripperStatus[gri_i]));
     }
 
     //Config setting
@@ -535,6 +545,10 @@ void CuarmMessageHandler::pack_planner_state(PlannerState* state, char* send_buf
         for (int i = 0; i < state->GripperJointSize[gri_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%f#", state->GripperJointPos[gri_i][i]);
         }
+        sprintf(&(send_buffer[strlen(send_buffer)]), "%hu#", state->GripperSpeed[gri_i]);
+        sprintf(&(send_buffer[strlen(send_buffer)]), "%hu#", state->GripperForce[gri_i]);
+        sprintf(&(send_buffer[strlen(send_buffer)]), "%u#", state->GripperCommandId[gri_i]);
+        sprintf(&(send_buffer[strlen(send_buffer)]), "%hhu#", state->GripperStatus[gri_i]);
     }
 
     //Config setting
@@ -1002,4 +1016,3 @@ void CuarmMessageHandler::unpack_rt_config_state(RtConfigState* state, char* rec
         }
     }
 }
-

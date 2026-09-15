@@ -13,7 +13,9 @@
 // #endif
 enum class MotionControl{kJoint, kNull, kTask, kMotor, kTaskLine, kControlAlgorithm, kJointJog, kTaskJog, kTaskLineJog, kPlayback};
 enum OrientControl{kEnd, kBase};
-enum InterpolationMethod{kLinear, kCos, kCubic, kQuintic, kNone, kQuinticPath};
+// Keep the existing numeric values stable because this enum is serialized over UDP.
+// kDirect is appended for high-rate SDK position streaming without interpolation.
+enum InterpolationMethod{kLinear, kCos, kCubic, kQuintic, kNone, kQuinticPath, kDirect};
 enum class InterpolationMotionPhase{kInitialized, kAcceleration, kConstantVelocity, kDeceleration, kFinished, kInterrupted};
 enum class ControlType{kInvalid=-1, kPosition, kVelocity, kTorque};
 enum class CameraMode{kCapturing, kStreaming};
@@ -101,7 +103,7 @@ namespace DiagnosticFlags {
 /*
  * Micro for data transfermation
  */
-#define MAX_ARM_SIZE                  2
+#define MAX_ARM_SIZE                  3
 #define MAX_MOTOR_SIZE                7
 #define MAX_JOINT_SIZE                14
 #define MAX_ORIENTATION_SIZE          8
@@ -167,6 +169,10 @@ struct PlannerState{
     uint8_t GripperSize;
     uint8_t GripperJointSize[MAX_ARM_SIZE];
     float   GripperJointPos[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    uint16_t GripperSpeed[MAX_ARM_SIZE];
+    uint16_t GripperForce[MAX_ARM_SIZE];
+    uint32_t GripperCommandId[MAX_ARM_SIZE];
+    uint8_t  GripperStatus[MAX_ARM_SIZE];  // 0=moving, 1=reached, 2=error
 
     //Config setting
     float tool_offset[MAX_ARM_SIZE][3];
@@ -294,6 +300,9 @@ struct PanelCommand{
     uint8_t GripperSize;
     uint8_t GripperJointSize[MAX_ARM_SIZE];
     float   GripperJointCmd[MAX_ARM_SIZE][MAX_JOINT_SIZE];
+    uint16_t GripperSpeed[MAX_ARM_SIZE];
+    uint16_t GripperForce[MAX_ARM_SIZE];
+    uint32_t GripperCommandId[MAX_ARM_SIZE];
 
     //Config setting
     float tool_offset[MAX_ARM_SIZE][3];
