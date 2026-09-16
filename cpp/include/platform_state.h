@@ -163,12 +163,13 @@ namespace robot::platform {
     
     /**
      * @brief The plan result to apply.
+     * @param kNone No applicable(Non Cartesian Control).
      * @param kSuccess The success plan result.
      * @param kPoseNotReachable The pose not reachable plan result.
      * @param kLinearPathFailed The linear path failed plan result.
      */
     enum class PlanResult : uint8_t {
-        kNone                       = 0, //No applicable
+        kNone                       = 0,  //No applicable(Non Cartesian Control)
         kSuccess                    = 1,  // IK passed, time allocation valid, safe to execute
         kPoseNotReachable           = 2,  // Target 6D pose is physically outside the workspace
         kLinearPathFailed           = 3,  // Reachable target, but continuous linear path is blocked (Singularity / Joint Limit)

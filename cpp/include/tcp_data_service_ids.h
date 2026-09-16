@@ -2,6 +2,7 @@
 #define TCP_DATA_SERVICE_IDS_H
 
 #include <cstdint>
+#include <cstddef> // std::size_t
 
 namespace robot::platform::tcp_data {
 
