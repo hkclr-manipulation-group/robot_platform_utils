@@ -2,6 +2,7 @@
 #define TCP_DATA_SERVICE_IDS_H
 
 #include <cstdint>
+#include <cstddef> // std::size_t
 
 namespace robot::platform::tcp_data {
 
@@ -12,7 +13,7 @@ struct RpcSessionAuth {
     std::uint32_t sequence_id = 0;
 };
 
-constexpr std::size_t kRpcSessionAuthSize = sizeof(std::uint16_t) + sizeof(std::uint32_t) + sizeof(std::uint32_t);
+constexpr size_t kRpcSessionAuthSize = sizeof(std::uint16_t) + sizeof(std::uint32_t) + sizeof(std::uint32_t);
 
 enum class ServiceId : std::uint32_t {
     kStorage = 1,
