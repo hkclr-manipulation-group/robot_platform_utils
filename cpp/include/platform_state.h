@@ -554,7 +554,7 @@ namespace robot::platform {
         uint32_t magic_header = MAGIC_HEADER; 
         uint16_t client_id;                   
         uint32_t sequence_id;                 // Anti-replay counter
-        uint16_t telemetry_port;              // Port for telemetry data
+        uint16_t telemetry_port;              // 0 = discovery only; otherwise the bound telemetry receive port
         uint64_t timestamp_us;                // Integrity timestamp
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };
@@ -647,7 +647,7 @@ namespace robot::platform {
             SystemState             system_state;       // Idle, Running, Paused
             PlanResult              plan_result;
             uint64_t                system_diagnostic_flags; 
-            uint32_t                session_id;  // Proves WHICH client is currently controlling it
+            uint32_t                session_id;  // External connection session receiving this state; 0 when disconnected
             uint32_t                last_processed_seq; // Matches the client's SdkCommandReq sequence_id
 
             uint8_t                 arm_size = 0;

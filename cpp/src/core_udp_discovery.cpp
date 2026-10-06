@@ -537,7 +537,7 @@ bool shouldIgnoreLoopbackDiscoveryReply(
 }
 
 std::string makeDiscoveryMergeKey(const DiscoveredServer& server) {
-    return std::to_string(server.session_id) + '|' + server.robot_name;
+    return server.server_ip + '|' + server.robot_name;
 }
 
 void mergeDiscoveredServerEntry(
@@ -804,11 +804,11 @@ DiscoveredServer discoverRtServerViaHandshake(
     if (probe_ips.empty()) {
         throw std::invalid_argument("discoverRtServerViaHandshake: probe_ips is empty");
     }
-    if (core_request_port <= 0 || local_ack_port <= 0) {
+    if (core_request_port <= 0 || local_ack_port < 0) {
         throw std::invalid_argument("discoverRtServerViaHandshake: invalid ports");
     }
-    if (telemetry_port <= 0) {
-        throw std::invalid_argument("discoverRtServerViaHandshake: telemetry_port must be > 0");
+    if (telemetry_port < 0) {
+        throw std::invalid_argument("discoverRtServerViaHandshake: telemetry_port must be >= 0");
     }
     if (max_attempts_per_probe < 1) {
         max_attempts_per_probe = 1;
@@ -966,11 +966,11 @@ std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(
     if (probe_ips.empty()) {
         throw std::invalid_argument("discoverAllRtServersViaHandshake: probe_ips is empty");
     }
-    if (core_request_port <= 0 || local_ack_port <= 0) {
+    if (core_request_port <= 0 || local_ack_port < 0) {
         throw std::invalid_argument("discoverAllRtServersViaHandshake: invalid ports");
     }
-    if (telemetry_port <= 0) {
-        throw std::invalid_argument("discoverAllRtServersViaHandshake: telemetry_port must be > 0");
+    if (telemetry_port < 0) {
+        throw std::invalid_argument("discoverAllRtServersViaHandshake: telemetry_port must be >= 0");
     }
     if (max_attempts_per_probe < 1) {
         max_attempts_per_probe = 1;

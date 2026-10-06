@@ -7,7 +7,7 @@
 
 namespace robot::platform {
 
-/** Result of probing the network with SdkHandshakeReq. */
+/** Result of a discovery-only SdkHandshakeReq (telemetry_port == 0). */
 struct DiscoveredServer {
     std::string robot_name;
     std::string server_ip;
@@ -36,8 +36,8 @@ struct DiscoveredServer {
  *
  * @param client_id         Panel / SDK client id (HMAC + session bookkeeping).
  * @param core_request_port Destination UDP port (same as CoreUdpServer local_port).
- * @param telemetry_port    Telemetry UDP port (same as CoreUdpServer telemetry port).
- * @param local_ack_port    Local bind port for the handshake reply (same as CoreUdpClient ack port).
+ * @param telemetry_port    Zero for discovery-only; a positive port is legacy connect behavior.
+ * @param local_ack_port    Local bind port, or zero for an OS-assigned ephemeral port.
  * @param probe_ips         Unicast, multicast, and/or 255.255.255.255 targets.
  * @param timeout_ms        Per-attempt wait for SdkHandshakeRes.
  * @param max_attempts_per_probe Retries per probe IP before moving on.
@@ -79,7 +79,7 @@ inline DiscoveredServer discoverRtServerViaHandshake(
  * (WiFi APs often block broadcast but allow direct unicast). Returns an empty
  * vector when none respond (does not throw).
  * Ignores loopback (127.0.0.1) replies and merges entries that share the same
- * session_id + robot_name so one rt_control is listed once.
+ * server_ip + robot_name so one rt_control is listed once.
  * Returns an empty vector when none respond (does not throw for "not found").
  */
 std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(

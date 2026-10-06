@@ -43,10 +43,17 @@ namespace robot::platform {
                 float ack_dt_ms = 0.0f);
             ~CoreUdpClient();
             void send(const CoreRequestVariantPtr& data);
+            /** Send a control request from the bound telemetry socket (NAT path registration). */
+            bool sendFromTelemetry(const CoreRequestVariantPtr& data);
+            /** Synchronously receive the matching ACK on the telemetry socket. */
+            CoreResponseVariantPtr waitTelemetryAck(
+                uint16_t client_id, uint32_t sequence_id, float timeout_ms);
             bool receive(SrvState& data, int timeout_us);
             CoreResponseVariantPtr waitAck(uint16_t client_id, uint32_t sequence_id, float timeout_ms);
             void close();
             CommandResponseStatus getLastStatus() const;
+            int localAckPort() const;
+            int telemetryLocalPort() const;
 
         private:
             void ackThreadTask(int ack_dt_us);

@@ -1,11 +1,13 @@
 #include "core_udp_client.h"
 
+#include <algorithm>
 #include <chrono>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "platform_serialization.h"
 
@@ -101,15 +103,69 @@ void CoreUdpClient::send(const CoreRequestVariantPtr& data){
     udp_send(send_udp_node_ptr_.get(), written_size);
 }
 
+bool CoreUdpClient::sendFromTelemetry(const CoreRequestVariantPtr& data){
+    if (!pack_function_ || !telemetry_udp_node_ptr_ || !send_udp_node_ptr_) {
+        return false;
+    }
+    std::vector<std::uint8_t> buffer(send_buffer_size_);
+    std::size_t written_size = 0;
+    if (!pack_function_(data, buffer.data(), buffer.size(), written_size) || written_size == 0) {
+        return false;
+    }
+    const int sent = sendto(
+        telemetry_udp_node_ptr_->receive_fd,
+        reinterpret_cast<const char*>(buffer.data()),
+        static_cast<int>(written_size),
+        0,
+        reinterpret_cast<const sockaddr*>(&send_udp_node_ptr_->send_addr),
+        sizeof(send_udp_node_ptr_->send_addr));
+    return sent == static_cast<int>(written_size);
+}
+
+CoreResponseVariantPtr CoreUdpClient::waitTelemetryAck(
+    uint16_t client_id, uint32_t sequence_id, float timeout_ms){
+    if (!ack_unpack_function_ || !telemetry_udp_node_ptr_) {
+        return {};
+    }
+    const auto deadline = std::chrono::steady_clock::now()
+        + std::chrono::milliseconds(static_cast<long>(timeout_ms));
+    while (std::chrono::steady_clock::now() < deadline) {
+        const auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(
+            deadline - std::chrono::steady_clock::now()).count();
+        if (remaining <= 0) break;
+        sockaddr_in source_addr{};
+        const int received = udp_select1(
+            telemetry_udp_node_ptr_.get(),
+            static_cast<int>(std::min<int64_t>(remaining, 100000)),
+            static_cast<int>(receive_buffer_size_),
+            &source_addr);
+        if (received <= 0) continue;
+        CoreResponseVariantPtr ack;
+        if (ack_unpack_function_(telemetry_udp_node_ptr_->receive_buffer,
+                                 static_cast<std::size_t>(received), ack)
+            && ackMatches(ack, client_id, sequence_id)) {
+            return ack;
+        }
+    }
+    return {};
+}
+
 bool CoreUdpClient::receive(SrvState& data, int timeout_us){
     if (!unpack_function_) {
         throw std::runtime_error("Unpack function is not defined.");
     }
 
-    std::size_t written_buffer_size = udp_select(telemetry_udp_node_ptr_.get(), timeout_us, receive_buffer_size_);
+    sockaddr_in source_addr{};
+    std::size_t written_buffer_size = udp_select1(
+        telemetry_udp_node_ptr_.get(), timeout_us, receive_buffer_size_, &source_addr);
     if (written_buffer_size > 0) {
-        unpack_function_(telemetry_udp_node_ptr_->receive_buffer, written_buffer_size, data);
-        return true;
+        // Do not require the telemetry packet's source address to equal the
+        // command target address.  A robot bound to 0.0.0.0 may legitimately
+        // egress through another address on a multi-homed host.  Authentication
+        // is provided by HMAC; the SDK layer additionally checks session_id and
+        // robot_name, which are the correct demultiplexing keys.
+        return unpack_function_(
+            telemetry_udp_node_ptr_->receive_buffer, written_buffer_size, data);
     }
     return false;
 }
@@ -153,6 +209,14 @@ void CoreUdpClient::close(){
 
 CommandResponseStatus CoreUdpClient::getLastStatus() const{
     return last_status_;
+}
+
+int CoreUdpClient::localAckPort() const {
+    return send_udp_node_ptr_ ? udp_get_receive_port(send_udp_node_ptr_.get()) : -1;
+}
+
+int CoreUdpClient::telemetryLocalPort() const {
+    return telemetry_udp_node_ptr_ ? udp_get_receive_port(telemetry_udp_node_ptr_.get()) : -1;
 }
 
 void CoreUdpClient::ackThreadTask(int ack_dt_us){
