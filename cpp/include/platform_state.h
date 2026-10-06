@@ -702,13 +702,13 @@ namespace robot::platform {
     };
 
     struct PlannerCommand{
-        bool read_only = true;
-
+        bool        arm_read_only = true;
         ControlType arm_command_mode;
         uint8_t     arm_size;
         uint8_t     arm_joint_size[MAX_ARM_SIZE];
         float       arm_joint_target[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
 
+        bool        gripper_read_only = true;
         uint8_t     gripper_size;
         uint8_t     gripper_joint_size[MAX_GRIPPER_SIZE];
         float       gripper_joint_target[MAX_GRIPPER_SIZE][MAX_GRIPPER_JOINT_SIZE];
