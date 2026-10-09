@@ -358,7 +358,7 @@ namespace robot::platform {
 
     struct SinglePointTarget{
         float               interpolation_t; // Position moves: 0 selects speed mode; >0 requests a duration (may only extend).
-        float               interpolation_speed_ratio; // Position moves: t=0 uses (0,1]; server also accepts legacy percentages >1 (clamped at 100%). t>0 uses full soft limits.
+        float               interpolation_speed_ratio; // Position moves: peak-velocity cap as (0,1] or legacy % (>1 clamped). Applies in speed mode (t=0) and as ceiling during timed moves (t>0).
 
         float               gripper_joint[MAX_GRIPPER_SIZE][MAX_GRIPPER_JOINT_SIZE];
 
