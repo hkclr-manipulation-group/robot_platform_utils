@@ -573,6 +573,53 @@ namespace robot::platform::serialization {
         return true;
     }
 
+    bool toBytes(const SdkDisconnectReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        std::uint8_t* cursor = buffer;
+        std::size_t remaining = buffer_size;
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+
+        try{
+            writeRaw(value.magic_header, cursor, remaining);
+            writeEnum(MessageType::kSdkDisconnectReq, cursor, remaining);
+            writeRaw(value.client_id, cursor, remaining);
+
+            writeRaw(value.session_id, cursor, remaining);
+            writeRaw(value.sequence_id, cursor, remaining);
+            writeRaw(value.timestamp_us, cursor, remaining);
+        }catch (const std::exception& e) {
+            catchToBytesError("catchToBytesError:toBytes(SdkDisconnectReq)", e, value, buffer_size, written_size, write_phase);
+            return false;
+        }
+
+        written_size = cursor - buffer;
+        return true;
+    }
+
+    bool toBytes(const SdkDisconnectRes& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        std::uint8_t* cursor = buffer;
+        std::size_t remaining = buffer_size;
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+
+        try{
+            writeRaw(value.magic_header, cursor, remaining);
+            writeEnum(MessageType::kSdkDisconnectRes, cursor, remaining);
+            writeRaw(value.request_client_id, cursor, remaining);
+
+            writeRaw(value.request_sequence_id, cursor, remaining);
+            writeRaw(value.request_received_us, cursor, remaining);
+            writeRaw(value.response_sent_us, cursor, remaining);
+
+            writeEnum(value.payload.status, cursor, remaining);
+            write_phase.push_back(std::make_pair("after assigned_session_id", cursor - buffer));
+
+        }catch (const std::exception& e) {
+            catchToBytesError("catchToBytesError:toBytes(SdkDisconnectRes)", e, value, buffer_size, written_size, write_phase);
+            return false;
+        }
+        written_size = cursor - buffer;
+        return true;
+    }
+
     bool toBytes(const SdkRecoveryReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
         std::uint8_t* cursor = buffer;
         std::size_t remaining = buffer_size;
@@ -689,6 +736,8 @@ namespace robot::platform::serialization {
             return toBytes(std::get<SdkHandshakeReq>(variant), buffer, buffer_size, written_size);
         } else if (std::holds_alternative<SdkReleaseControlReq>(variant)) {
             return toBytes(std::get<SdkReleaseControlReq>(variant), buffer, buffer_size, written_size);
+        } else if (std::holds_alternative<SdkDisconnectReq>(variant)) {
+            return toBytes(std::get<SdkDisconnectReq>(variant), buffer, buffer_size, written_size);
         } else if (std::holds_alternative<SdkRecoveryReq>(variant)) {
             return toBytes(std::get<SdkRecoveryReq>(variant), buffer, buffer_size, written_size);
         }
@@ -708,6 +757,8 @@ namespace robot::platform::serialization {
             return toBytes(std::get<SdkHandshakeRes>(variant), buffer, buffer_size, written_size);
         } else if (std::holds_alternative<SdkReleaseControlRes>(variant)) {
             return toBytes(std::get<SdkReleaseControlRes>(variant), buffer, buffer_size, written_size);
+        } else if (std::holds_alternative<SdkDisconnectRes>(variant)) {
+            return toBytes(std::get<SdkDisconnectRes>(variant), buffer, buffer_size, written_size);
         } else if (std::holds_alternative<SdkRecoveryRes>(variant)) {
             return toBytes(std::get<SdkRecoveryRes>(variant), buffer, buffer_size, written_size);
         }
@@ -984,6 +1035,37 @@ namespace robot::platform::serialization {
         return verifyReadBuffer("fromBytes(SdkReleaseControlRes)", cursor, buffer, buffer_size, write_phase);
     }
 
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkDisconnectReq& value){
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+        const std::uint8_t* cursor = buffer;
+        readRaw(cursor, value.magic_header);
+        cursor += sizeof(MessageType); // Skip message type
+        write_phase.push_back(std::make_pair("after message type", cursor - buffer));
+
+        readRaw(cursor, value.client_id);
+        readRaw(cursor, value.session_id);
+        readRaw(cursor, value.sequence_id);
+        readRaw(cursor, value.timestamp_us);
+
+        return verifyReadBuffer("fromBytes(SdkDisconnectReq)", cursor, buffer, buffer_size, write_phase);
+    }
+
+    bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkDisconnectRes& value){
+        std::vector<std::pair<std::string, std::uint8_t>> write_phase;
+        const std::uint8_t* cursor = buffer;
+        readRaw(cursor, value.magic_header);
+        cursor += sizeof(MessageType); // Skip message type
+        write_phase.push_back(std::make_pair("after message type", cursor - buffer));
+
+        readRaw(cursor, value.request_client_id);
+        readRaw(cursor, value.request_sequence_id);
+        readRaw(cursor, value.request_received_us);
+        readRaw(cursor, value.response_sent_us);
+
+        readEnum(cursor, value.payload.status);
+        return verifyReadBuffer("fromBytes(SdkDisconnectRes)", cursor, buffer, buffer_size, write_phase);
+    }
+
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkRecoveryReq& value){
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
@@ -1086,6 +1168,9 @@ namespace robot::platform::serialization {
         }else if (message_type == MessageType::kSdkReleaseControlReq) {
             auto& req_ref = value->emplace<SdkReleaseControlReq>();
             parse_success = fromBytes(buffer, buffer_size, req_ref);
+        }else if (message_type == MessageType::kSdkDisconnectReq) {
+            auto& req_ref = value->emplace<SdkDisconnectReq>();
+            parse_success = fromBytes(buffer, buffer_size, req_ref);
         }else if (message_type == MessageType::kSdkRecoveryReq) {
             auto& req_ref = value->emplace<SdkRecoveryReq>();
             parse_success = fromBytes(buffer, buffer_size, req_ref);
@@ -1114,6 +1199,9 @@ namespace robot::platform::serialization {
             parse_success = fromBytes(buffer, buffer_size, res_ref);
         }else if (message_type == MessageType::kSdkReleaseControlRes) {
             auto& res_ref = value->emplace<SdkReleaseControlRes>();
+            parse_success = fromBytes(buffer, buffer_size, res_ref);
+        }else if (message_type == MessageType::kSdkDisconnectRes) {
+            auto& res_ref = value->emplace<SdkDisconnectRes>();
             parse_success = fromBytes(buffer, buffer_size, res_ref);
         }else if (message_type == MessageType::kSdkRecoveryRes) {
             auto& res_ref = value->emplace<SdkRecoveryRes>();

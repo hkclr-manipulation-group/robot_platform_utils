@@ -301,6 +301,8 @@ namespace robot::platform {
         kSdkReleaseControlRes,
         kSdkRecoveryReq,
         kSdkRecoveryRes,
+        kSdkDisconnectReq,
+        kSdkDisconnectRes,
     };
 
     enum class NetworkConfigAction : uint8_t {
@@ -601,6 +603,29 @@ namespace robot::platform {
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };
 
+    struct SdkDisconnectReq {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t client_id;
+        uint32_t session_id;
+        uint32_t sequence_id;
+        uint64_t timestamp_us;
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+
+    struct SdkDisconnectRes {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t request_client_id;
+        uint32_t request_sequence_id;
+        uint64_t request_received_us;
+        uint64_t response_sent_us;
+
+        struct {
+            CommandResponseStatus status;
+        } payload;
+
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+
     struct SdkRecoveryReq {
         uint32_t magic_header = MAGIC_HEADER;
         uint16_t client_id;
@@ -625,8 +650,8 @@ namespace robot::platform {
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };
     
-    using CoreRequestVariant = std::variant<std::monostate, SdkCommandReq, SdkConfigReq, SdkHandshakeReq, SdkReleaseControlReq, SdkRecoveryReq>;
-    using CoreResponseVariant = std::variant<std::monostate, SdkCommandRes, SdkConfigRes, SdkHandshakeRes, SdkReleaseControlRes, SdkRecoveryRes>;
+    using CoreRequestVariant = std::variant<std::monostate, SdkCommandReq, SdkConfigReq, SdkHandshakeReq, SdkReleaseControlReq, SdkDisconnectReq, SdkRecoveryReq>;
+    using CoreResponseVariant = std::variant<std::monostate, SdkCommandRes, SdkConfigRes, SdkHandshakeRes, SdkReleaseControlRes, SdkDisconnectRes, SdkRecoveryRes>;
     using MonitoringRequestVariant = std::variant<std::monostate, SdkHeartbeatReq, SdkSafeguardReq>;
     using CoreRequestVariantPtr = std::unique_ptr<CoreRequestVariant>;
     using CoreResponseVariantPtr = std::shared_ptr<CoreResponseVariant>;
