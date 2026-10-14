@@ -315,6 +315,27 @@ namespace robot::platform {
         std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
     }
 
+    void print(const SdkDisconnectReq& value){
+        std::cout << "SdkDisconnectReq\n";
+        std::cout << "  magic_header: " << value.magic_header << "\n";
+        std::cout << "  client_id: " << value.client_id << "\n";
+        std::cout << "  session_id: " << value.session_id << "\n";
+        std::cout << "  sequence_id: " << value.sequence_id << "\n";
+        std::cout << "  timestamp_us: " << value.timestamp_us << "\n";
+        std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
+    }
+
+    void print(const SdkDisconnectRes& value){
+        std::cout << "SdkDisconnectRes\n";
+        std::cout << "  magic_header: " << value.magic_header << "\n";
+        std::cout << "  request_client_id: " << value.request_client_id << "\n";
+        std::cout << "  request_sequence_id: " << value.request_sequence_id << "\n";
+        std::cout << "  request_received_us: " << value.request_received_us << "\n";
+        std::cout << "  response_sent_us: " << value.response_sent_us << "\n";
+        std::cout << "  payload.status: " << enumToString(value.payload.status) << "\n";
+        std::cout << "  security_hmac: " << toHexString(value.security_hmac, kHmacSize) << "\n";
+    }
+
     void print(const SdkRecoveryReq& value){
         std::cout << "SdkRecoveryReq\n";
         std::cout << "  magic_header: " << value.magic_header << "\n";

@@ -301,6 +301,8 @@ namespace robot::platform {
         kSdkReleaseControlRes,
         kSdkRecoveryReq,
         kSdkRecoveryRes,
+        kSdkDisconnectReq,
+        kSdkDisconnectRes,
     };
 
     enum class NetworkConfigAction : uint8_t {
@@ -357,8 +359,8 @@ namespace robot::platform {
     };
 
     struct SinglePointTarget{
-        float               interpolation_t; // Minimum interpolation time, t >= 0. May be extended based on interpolation_speed_ratio.
-        float               interpolation_speed_ratio; // Ratio of soft joint limit, range (0, 1]. 0 keeps current ratio.
+        float               interpolation_t; // Position moves: 0 selects speed mode; >0 requests a duration (may only extend).
+        float               interpolation_speed_ratio; // Position moves: peak-velocity cap as (0,1] or legacy % (>1 clamped). Applies in speed mode (t=0) and as ceiling during timed moves (t>0).
 
         float               gripper_joint[MAX_GRIPPER_SIZE][MAX_GRIPPER_JOINT_SIZE];
 
@@ -601,6 +603,29 @@ namespace robot::platform {
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };
 
+    struct SdkDisconnectReq {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t client_id;
+        uint32_t session_id;
+        uint32_t sequence_id;
+        uint64_t timestamp_us;
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+
+    struct SdkDisconnectRes {
+        uint32_t magic_header = MAGIC_HEADER;
+        uint16_t request_client_id;
+        uint32_t request_sequence_id;
+        uint64_t request_received_us;
+        uint64_t response_sent_us;
+
+        struct {
+            CommandResponseStatus status;
+        } payload;
+
+        uint8_t  security_hmac[HMAC_KEY_SIZE];
+    };
+
     struct SdkRecoveryReq {
         uint32_t magic_header = MAGIC_HEADER;
         uint16_t client_id;
@@ -625,8 +650,8 @@ namespace robot::platform {
         uint8_t  security_hmac[HMAC_KEY_SIZE];
     };
     
-    using CoreRequestVariant = std::variant<std::monostate, SdkCommandReq, SdkConfigReq, SdkHandshakeReq, SdkReleaseControlReq, SdkRecoveryReq>;
-    using CoreResponseVariant = std::variant<std::monostate, SdkCommandRes, SdkConfigRes, SdkHandshakeRes, SdkReleaseControlRes, SdkRecoveryRes>;
+    using CoreRequestVariant = std::variant<std::monostate, SdkCommandReq, SdkConfigReq, SdkHandshakeReq, SdkReleaseControlReq, SdkDisconnectReq, SdkRecoveryReq>;
+    using CoreResponseVariant = std::variant<std::monostate, SdkCommandRes, SdkConfigRes, SdkHandshakeRes, SdkReleaseControlRes, SdkDisconnectRes, SdkRecoveryRes>;
     using MonitoringRequestVariant = std::variant<std::monostate, SdkHeartbeatReq, SdkSafeguardReq>;
     using CoreRequestVariantPtr = std::unique_ptr<CoreRequestVariant>;
     using CoreResponseVariantPtr = std::shared_ptr<CoreResponseVariant>;
@@ -702,13 +727,13 @@ namespace robot::platform {
     };
 
     struct PlannerCommand{
-        bool read_only = true;
-
+        bool        arm_read_only = true;
         ControlType arm_command_mode;
         uint8_t     arm_size;
         uint8_t     arm_joint_size[MAX_ARM_SIZE];
         float       arm_joint_target[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
 
+        bool        gripper_read_only = true;
         uint8_t     gripper_size;
         uint8_t     gripper_joint_size[MAX_GRIPPER_SIZE];
         float       gripper_joint_target[MAX_GRIPPER_SIZE][MAX_GRIPPER_JOINT_SIZE];

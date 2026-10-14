@@ -25,6 +25,13 @@ YAML::Node loadYamlFile(const std::string& filename);
  */
 YAML::Node loadYamlConfig(const std::string& filename);
 
+/**
+ * Like loadYamlConfig, but replaces `robot.import_yaml` before expanding imports.
+ * Used when runtime hardware detection selects the robot assembly variant.
+ */
+YAML::Node loadYamlConfigWithRobotImportOverride(const std::string& filename,
+                                                 const std::string& robot_import_yaml);
+
 /** Non-throwing variant of loadYamlConfig. */
 bool tryLoadYamlConfig(const std::string& filename, YAML::Node& out, std::string& error_message);
 

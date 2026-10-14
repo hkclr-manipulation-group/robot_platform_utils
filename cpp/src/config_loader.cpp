@@ -338,9 +338,12 @@ YAML::Node loadYamlFile(const std::string& filename) {
     return loadYamlFileCached(std::filesystem::path(filename));
 }
 
-YAML::Node loadYamlConfig(const std::string& filename) {
+YAML::Node loadYamlConfigWithRobotImportOverride(const std::string& filename,
+                                                 const std::string& robot_import_yaml) {
     const std::filesystem::path path(filename);
-    const std::string cache_key = cacheKeyForPath(path);
+    const std::string path_key = cacheKeyForPath(path);
+    const std::string cache_key =
+        robot_import_yaml.empty() ? path_key : path_key + "|robot_import=" + robot_import_yaml;
     const std::optional<FileTime> root_mtime = queryFileMtime(path);
     if (!root_mtime.has_value()) {
         throw YamlLoadError("YAML file not found: " + path.string());
@@ -355,10 +358,14 @@ YAML::Node loadYamlConfig(const std::string& filename) {
     }
 
     YAML::Node root_config = loadYamlFileCached(path);
+    if (!robot_import_yaml.empty() && root_config["robot"]) {
+        root_config["robot"]["import_yaml"] = robot_import_yaml;
+    }
+
     std::unordered_set<std::string> visited;
     std::vector<std::pair<std::string, FileTime>> dependencies;
-    dependencies.emplace_back(cache_key, *root_mtime);
-    visited.insert(cache_key);
+    dependencies.emplace_back(path_key, *root_mtime);
+    visited.insert(path_key);
 
     YAML::Node processed = processImportsRecursive(
         root_config,
@@ -373,6 +380,10 @@ YAML::Node loadYamlConfig(const std::string& filename) {
             ProcessedYamlCacheEntry{dependencies, YAML::Clone(processed)};
     }
     return processed;
+}
+
+YAML::Node loadYamlConfig(const std::string& filename) {
+    return loadYamlConfigWithRobotImportOverride(filename, std::string{});
 }
 
 bool tryLoadYamlConfig(const std::string& filename, YAML::Node& out, std::string& error_message) {

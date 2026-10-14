@@ -546,9 +546,6 @@ void mergeDiscoveredServerEntry(
     existing.last_handshake_sequence_id = std::max(
         existing.last_handshake_sequence_id,
         incoming.last_handshake_sequence_id);
-    existing.protocol_major = incoming.protocol_major;
-    existing.protocol_minor = incoming.protocol_minor;
-    existing.protocol_capabilities = incoming.protocol_capabilities;
     if (!incoming.robot_name.empty()) {
         existing.robot_name = incoming.robot_name;
     }
