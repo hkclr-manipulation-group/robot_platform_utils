@@ -25,9 +25,18 @@ enum class ServiceId : std::uint32_t {
     kConfig = 6,
     /** Runtime settings persistence and profile management. */
     kRuntimeSettings = 7,
+    /** Versioned fault/recovery operations; existing UDP layouts unchanged. */
+    kRecovery = 8,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */
+enum class RecoveryMethod : std::uint32_t {
+    kGetCapabilities = 1,
+    kGetFaultStatus = 2,
+    kRequestRecovery = 3,
+    kGetRecoveryStatus = 4,
+};
+
 enum class NetworkMethod : std::uint32_t {
     kGet = 0,
     kSetWifi = 1,

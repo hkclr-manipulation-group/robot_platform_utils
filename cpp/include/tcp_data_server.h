@@ -48,6 +48,13 @@ public:
         virtual bool onBlobComplete(const BlobReceipt& receipt, std::string& error_message) = 0;
         virtual RpcResult onRpcRequest(std::uint32_t service_id, std::uint32_t method_id,
                                        const std::uint8_t* request_body, std::size_t request_size) = 0;
+        // Identity comes exclusively from successful transport authentication.
+        // Existing handlers retain their source behavior through this default.
+        virtual RpcResult onAuthenticatedRpcRequest(const tcp_data::RpcSessionAuth& auth,
+            std::uint32_t service_id, std::uint32_t method_id,
+            const std::uint8_t* request_body, std::size_t request_size) {
+            (void)auth; return onRpcRequest(service_id,method_id,request_body,request_size);
+        }
     };
 
     static constexpr int kDefaultPort = 8890;
