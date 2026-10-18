@@ -62,6 +62,10 @@ enum class SystemMethod : std::uint32_t {
     kSetArmSerialNumber = 5,
     /** Request body empty. Persist current runtime settings to disk (same as RuntimeSettings::Flush). */
     kFlushRuntimeConfig = 6,
+    /** Empty request. UTF-8 JSON health snapshot; schema_version=1. No hardware I/O. */
+    kGetHardwareHealthJson = 7,
+    /** Request: uint16 little-endian receive port; 0 disables. Response empty. */
+    kSetHardwareHealthStream = 8,
 };
 
 enum class RuntimeSettingsMethod : std::uint32_t {
