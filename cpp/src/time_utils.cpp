@@ -2,25 +2,8 @@
 #include <time.h>
 
 #if defined(_WIN32) || defined(WIN32)
-    // winsock2.h MUST come before windows.h to correctly define struct timeval
-    #include <winsock2.h> 
-    #include <windows.h>
     #include <chrono>
     #include <thread>
-
-    // Drop-in replacement for gettimeofday using modern standard C++
-    inline int gettimeofday(struct timeval* tp, void* tzp) {
-        if (tp) {
-            auto now = std::chrono::system_clock::now();
-            auto duration = now.time_since_epoch();
-            auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration);
-            auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration) - seconds;
-            
-            tp->tv_sec = static_cast<long>(seconds.count());
-            tp->tv_usec = static_cast<long>(microseconds.count());
-        }
-        return 0;
-    }
 #else
     #include <sys/time.h>
 #endif
@@ -40,14 +23,17 @@ namespace robot::platform {
     #endif
     }
 
-    long get_time_now(){
+    int64_t get_time_now(){
         #ifdef KERNEL_XENOMAI
             RTIME now = rt_timer_read();
             return now / 1000;
-        #else // preempt_rt, linux & windows
+        #elif defined(_WIN32) || defined(WIN32)
+            return std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+        #else // preempt_rt, linux
             struct timeval t;
             gettimeofday(&t, NULL);
-            return t.tv_sec * 1000000 + t.tv_usec;
+            return static_cast<int64_t>(t.tv_sec) * 1000000 + t.tv_usec;
         #endif
     }
 }

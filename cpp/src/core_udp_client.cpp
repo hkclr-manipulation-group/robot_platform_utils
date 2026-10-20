@@ -108,8 +108,7 @@ bool CoreUdpClient::receive(SrvState& data, int timeout_us){
 
     std::size_t written_buffer_size = udp_select(telemetry_udp_node_ptr_.get(), timeout_us, receive_buffer_size_);
     if (written_buffer_size > 0) {
-        unpack_function_(telemetry_udp_node_ptr_->receive_buffer, written_buffer_size, data);
-        return true;
+        return unpack_function_(telemetry_udp_node_ptr_->receive_buffer, written_buffer_size, data);
     }
     return false;
 }
