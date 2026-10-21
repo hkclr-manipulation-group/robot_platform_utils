@@ -115,6 +115,7 @@ struct SelfCollisionDetectionConfig {
 
 struct RtControlConfig {
     float dt_control_ms = 0.f;
+    float joint_position_feedback_tolerance_deg = 0.f;
     std::string robotics_library;
     std::string actuator_mode_under_position_control;
     std::optional<SelfCollisionDetectionConfig> self_collision_detection;

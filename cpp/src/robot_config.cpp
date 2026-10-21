@@ -373,6 +373,11 @@ RtControlConfig parseRtControlConfig(
     const std::string& context) {
     requireNode(node, context, YAML::NodeType::Map);
     RtControlConfig rt_control;
+    if (node["joint_position_feedback_tolerance_deg"]) {
+        rt_control.joint_position_feedback_tolerance_deg = readScalar<float>(
+            node["joint_position_feedback_tolerance_deg"],
+            context + ".joint_position_feedback_tolerance_deg");
+    }
     if (node["dt_control_ms"]) {
         rt_control.dt_control_ms =
             readScalar<float>(node["dt_control_ms"], context + ".dt_control_ms");
