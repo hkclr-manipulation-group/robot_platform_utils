@@ -66,6 +66,10 @@ enum class SystemMethod : std::uint32_t {
     kGetHardwareHealthJson = 7,
     /** Request: uint16 little-endian receive port; 0 disables. Response empty. */
     kSetHardwareHealthStream = 8,
+    /** Empty request; versioned maintenance communication state. Method 9 reserved. */
+    kGetGripperCommunication = 10,
+    /** One byte 0|1. Changes I/O only; never changes tool topology. */
+    kSetGripperCommunication = 11,
 };
 
 enum class RuntimeSettingsMethod : std::uint32_t {
