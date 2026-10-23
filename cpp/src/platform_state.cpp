@@ -138,7 +138,7 @@ namespace robot::platform {
             for (std::size_t j = 0; j < value.payload.arm_size; ++j) {
                 if (value.payload.activated_control_strategy[j] == ControlStrategy::kJoint && !value.payload.enable_jog) {
                     std::string label = "arm_joint[" + std::to_string(j) + "]";
-                    printFloatArray(label, target.arm_joint[j], MAX_ARM_JOINT_SIZE);
+                    printFloatArray(label, target.arm_joint[j], value.payload.arm_joint_size[j]);
                 } else if (value.payload.activated_control_strategy[j] != ControlStrategy::kJoint && !value.payload.enable_jog) {
                     std::string label = "arm_tool_cartesian[" + std::to_string(j) + "]";
                     printCartesianTarget(label, target.arm_tool_cartesian[j]);
