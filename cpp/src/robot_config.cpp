@@ -250,6 +250,10 @@ ArmSafetyConfig parseArmSafetyConfig(
     const std::string& context) {
     requireNode(node, context, YAML::NodeType::Map);
     ArmSafetyConfig safety;
+    if (node["joint_hard_limit"]) {
+        safety.joint_hard_limit = parseJointSoftLimitConfig(
+            node["joint_hard_limit"], context + ".joint_hard_limit");
+    }
     if (node["joint_soft_limit"]) {
         safety.joint_soft_limit = parseJointSoftLimitConfig(
             node["joint_soft_limit"], context + ".joint_soft_limit");
