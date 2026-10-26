@@ -493,6 +493,18 @@ namespace robot::platform {
         if (flags & DiagnosticFlags::kPlanInvalidSetting){
             result.push_back("PlanInvalidSetting: Invalid setting on interpolator");
         }
+        if (flags & DiagnosticFlags::kMotionCommandRejected){
+            result.push_back("MotionCommandRejected: Motion request rejected; a new request is required");
+        }
+        if (flags & DiagnosticFlags::kMotionStartPosOutOfRange){
+            result.push_back("MotionStartPosOutOfRange: Measured motion start exceeds hard position limits");
+        }
+        if (flags & DiagnosticFlags::kMotionProfilePosOutOfRange){
+            result.push_back("MotionProfilePosOutOfRange: Motion or stopping profile exceeds the allowed position envelope");
+        }
+        if (flags & DiagnosticFlags::kMotionBoundaryBlocked){
+            result.push_back("MotionBoundaryBlocked: Motion blocked by a joint position boundary");
+        }
 
         // --- Fault Flags ---
         if (flags & DiagnosticFlags::kFaultPosHardLimitReached){
