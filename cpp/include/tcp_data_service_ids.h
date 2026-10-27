@@ -25,9 +25,18 @@ enum class ServiceId : std::uint32_t {
     kConfig = 6,
     /** Runtime settings persistence and profile management. */
     kRuntimeSettings = 7,
+    /** Versioned fault/recovery operations; existing UDP layouts unchanged. */
+    kRecovery = 8,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */
+enum class RecoveryMethod : std::uint32_t {
+    kGetCapabilities = 1,
+    kGetFaultStatus = 2,
+    kRequestRecovery = 3,
+    kGetRecoveryStatus = 4,
+};
+
 enum class NetworkMethod : std::uint32_t {
     kGet = 0,
     kSetWifi = 1,
@@ -53,6 +62,14 @@ enum class SystemMethod : std::uint32_t {
     kSetArmSerialNumber = 5,
     /** Request body empty. Persist current runtime settings to disk (same as RuntimeSettings::Flush). */
     kFlushRuntimeConfig = 6,
+    /** Empty request. UTF-8 JSON health snapshot; schema_version=1. No hardware I/O. */
+    kGetHardwareHealthJson = 7,
+    /** Request: uint16 little-endian receive port; 0 disables. Response empty. */
+    kSetHardwareHealthStream = 8,
+    /** Empty request; versioned maintenance communication state. Method 9 reserved. */
+    kGetGripperCommunication = 10,
+    /** One byte 0|1. Changes I/O only; never changes tool topology. */
+    kSetGripperCommunication = 11,
 };
 
 enum class RuntimeSettingsMethod : std::uint32_t {

@@ -275,7 +275,7 @@ bool TcpDataServer::handleClient(DataChannelHandler& handler, int timeout_usec,
                     break;
                 }
 
-                RpcResult rpc = handler.onRpcRequest(service_id, method_id, request_body, request_body_size);
+                RpcResult rpc = handler.onAuthenticatedRpcRequest(auth, service_id, method_id, request_body, request_body_size);
                 if (!rpc.ok) {
                     sendError(header->sequence, rpc.error.empty() ? "rpc handler failed" : rpc.error, timeout_usec);
                     return false;

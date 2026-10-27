@@ -230,6 +230,13 @@ namespace robot::platform {
         constexpr uint64_t kPlanPointSkipped             = 1ULL << 19; // Duplicated points skipped
         constexpr uint64_t kPlanInvalidSetting           = 1ULL << 51; // Invalid setting on Interpolator
 
+        // Terminal execution rejection, bound to payload.last_processed_seq.
+        // Persist until the next command/configuration, fault, or owner change.
+        constexpr uint64_t kMotionCommandRejected       = 1ULL << 52;
+        constexpr uint64_t kMotionStartPosOutOfRange     = 1ULL << 53;
+        constexpr uint64_t kMotionProfilePosOutOfRange   = 1ULL << 54;
+        constexpr uint64_t kMotionBoundaryBlocked       = 1ULL << 55;
+
         // --- Fault Flags ---
         constexpr uint64_t kFaultPosHardLimitReached     = 1ULL << 20;
         constexpr uint64_t kFaultVelHardLimitReached     = 1ULL << 21;

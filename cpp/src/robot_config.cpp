@@ -250,6 +250,10 @@ ArmSafetyConfig parseArmSafetyConfig(
     const std::string& context) {
     requireNode(node, context, YAML::NodeType::Map);
     ArmSafetyConfig safety;
+    if (node["joint_hard_limit"]) {
+        safety.joint_hard_limit = parseJointSoftLimitConfig(
+            node["joint_hard_limit"], context + ".joint_hard_limit");
+    }
     if (node["joint_soft_limit"]) {
         safety.joint_soft_limit = parseJointSoftLimitConfig(
             node["joint_soft_limit"], context + ".joint_soft_limit");
@@ -373,6 +377,11 @@ RtControlConfig parseRtControlConfig(
     const std::string& context) {
     requireNode(node, context, YAML::NodeType::Map);
     RtControlConfig rt_control;
+    if (node["joint_position_feedback_tolerance_deg"]) {
+        rt_control.joint_position_feedback_tolerance_deg = readScalar<float>(
+            node["joint_position_feedback_tolerance_deg"],
+            context + ".joint_position_feedback_tolerance_deg");
+    }
     if (node["dt_control_ms"]) {
         rt_control.dt_control_ms =
             readScalar<float>(node["dt_control_ms"], context + ".dt_control_ms");
