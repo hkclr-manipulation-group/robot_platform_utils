@@ -43,6 +43,8 @@ namespace robot::platform {
                 float ack_dt_ms = 0.0f);
             ~CoreUdpClient();
             void send(const CoreRequestVariantPtr& data);
+            enum class ReceiveResult { NoDatagram, Decoded, DecodeRejected };
+            ReceiveResult receiveDetailed(SrvState& data, int timeout_us);
             bool receive(SrvState& data, int timeout_us);
             CoreResponseVariantPtr waitAck(uint16_t client_id, uint32_t sequence_id, float timeout_ms);
             void close();

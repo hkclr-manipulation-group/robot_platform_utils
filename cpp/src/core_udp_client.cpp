@@ -102,15 +102,20 @@ void CoreUdpClient::send(const CoreRequestVariantPtr& data){
 }
 
 bool CoreUdpClient::receive(SrvState& data, int timeout_us){
+    return receiveDetailed(data, timeout_us) == ReceiveResult::Decoded;
+}
+
+CoreUdpClient::ReceiveResult CoreUdpClient::receiveDetailed(SrvState& data, int timeout_us){
     if (!unpack_function_) {
         throw std::runtime_error("Unpack function is not defined.");
     }
 
     std::size_t written_buffer_size = udp_select(telemetry_udp_node_ptr_.get(), timeout_us, receive_buffer_size_);
     if (written_buffer_size > 0) {
-        return unpack_function_(telemetry_udp_node_ptr_->receive_buffer, written_buffer_size, data);
+        return unpack_function_(telemetry_udp_node_ptr_->receive_buffer, written_buffer_size, data)
+            ? ReceiveResult::Decoded : ReceiveResult::DecodeRejected;
     }
-    return false;
+    return ReceiveResult::NoDatagram;
 }
 
 CoreResponseVariantPtr CoreUdpClient::waitAck(uint16_t client_id, uint32_t sequence_id, float timeout_ms){
