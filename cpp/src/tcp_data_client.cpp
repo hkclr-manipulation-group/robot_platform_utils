@@ -714,6 +714,70 @@ TcpDataClient::Result TcpDataClient::setArmSafetySettingsJson(std::uint32_t arm_
                    timeout_usec);
 }
 
+TcpDataClient::Result TcpDataClient::calibrationGetState(std::string& state_json, int timeout_usec) {
+    Result rpc = callRpc(tcp_data::ServiceId::kCalibration,
+                         static_cast<std::uint32_t>(tcp_data::CalibrationMethod::kGetState), {}, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), state_json)) {
+        return Result{false, "TcpDataClient: failed to decode calibration state response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::calibrationDownloadParams(const std::string& package_json,
+                                                               std::string& result_json, int timeout_usec) {
+    std::vector<std::uint8_t> request_body;
+    if (!tcp_data::encodeNameRequest(package_json, request_body)) {
+        return Result{false, "TcpDataClient: failed to encode calibration package request", 0};
+    }
+    Result rpc = callRpc(tcp_data::ServiceId::kCalibration,
+                         static_cast<std::uint32_t>(tcp_data::CalibrationMethod::kDownloadParams), request_body,
+                         timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), result_json)) {
+        return Result{false, "TcpDataClient: failed to decode calibration download response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::calibrationReadbackVerify(std::string& verify_json, int timeout_usec) {
+    Result rpc = callRpc(tcp_data::ServiceId::kCalibration,
+                         static_cast<std::uint32_t>(tcp_data::CalibrationMethod::kReadbackVerify), {}, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), verify_json)) {
+        return Result{false, "TcpDataClient: failed to decode calibration verify response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
+TcpDataClient::Result TcpDataClient::calibrationCommit(int timeout_usec) {
+    return callRpc(tcp_data::ServiceId::kCalibration,
+                   static_cast<std::uint32_t>(tcp_data::CalibrationMethod::kCommit), {}, timeout_usec);
+}
+
+TcpDataClient::Result TcpDataClient::calibrationRollback(int timeout_usec) {
+    return callRpc(tcp_data::ServiceId::kCalibration,
+                   static_cast<std::uint32_t>(tcp_data::CalibrationMethod::kRollback), {}, timeout_usec);
+}
+
+TcpDataClient::Result TcpDataClient::calibrationReadCurrent(std::string& package_json, int timeout_usec) {
+    Result rpc = callRpc(tcp_data::ServiceId::kCalibration,
+                         static_cast<std::uint32_t>(tcp_data::CalibrationMethod::kReadCurrent), {}, timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (!tcp_data::decodeNameRequest(rpc.response_body.data(), rpc.response_body.size(), package_json)) {
+        return Result{false, "TcpDataClient: failed to decode calibration current response", rpc.status_code};
+    }
+    return Result{true, "ok", rpc.status_code, {}};
+}
+
 TcpDataClient::Result TcpDataClient::callNetworkConfig(tcp_data::NetworkMethod method,
                                                        const std::vector<std::uint8_t>& request_body,
                                                        tcp_data::NetworkConfigData& response, int timeout_usec) {

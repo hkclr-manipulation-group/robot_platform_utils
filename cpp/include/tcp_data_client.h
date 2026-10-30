@@ -120,6 +120,27 @@ public:
     Result setArmSafetySettingsJson(std::uint32_t arm_index, const std::string& json,
                                     int timeout_usec = kDefaultTimeoutUsec);
 
+    // --- Factory calibration (ServiceId::kCalibration) ---
+
+    /** Read the calibration state machine snapshot as JSON. */
+    Result calibrationGetState(std::string& state_json, int timeout_usec = kDefaultTimeoutUsec);
+
+    /** Stage a CalibrationPackage JSON. Response is a JSON {accepted, version} string. */
+    Result calibrationDownloadParams(const std::string& package_json, std::string& result_json,
+                                     int timeout_usec = kDefaultTimeoutUsec);
+
+    /** Write joint zero to EEPROM and verify. Response is a JSON {verified, joints[], crc_ok} string. */
+    Result calibrationReadbackVerify(std::string& verify_json, int timeout_usec = kDefaultTimeoutUsec);
+
+    /** Atomically commit the staged controller-side parameters. */
+    Result calibrationCommit(int timeout_usec = kDefaultTimeoutUsec);
+
+    /** Discard the staged package and return to IDLE. */
+    Result calibrationRollback(int timeout_usec = kDefaultTimeoutUsec);
+
+    /** Read the currently active CalibrationPackage JSON. */
+    Result calibrationReadCurrent(std::string& package_json, int timeout_usec = kDefaultTimeoutUsec);
+
     void close();
 
 private:

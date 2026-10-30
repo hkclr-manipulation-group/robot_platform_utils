@@ -6,7 +6,8 @@ namespace robot::platform {
         kSuccess = 0,
         kFailed = 1,
         kInvalidInput = 2,
-        kInvalidIndex = 3
+        kInvalidIndex = 3,
+        kNotSupported = 4
     };
 } // namespace robot::platform
 #endif

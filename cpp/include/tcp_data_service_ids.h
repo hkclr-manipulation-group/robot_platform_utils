@@ -27,6 +27,8 @@ enum class ServiceId : std::uint32_t {
     kRuntimeSettings = 7,
     /** Versioned fault/recovery operations; existing UDP layouts unchanged. */
     kRecovery = 8,
+    /** Factory calibration: download/verify/commit calibration parameters. Factory-only, high privilege. */
+    kCalibration = 9,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */
@@ -91,6 +93,21 @@ enum class LogMethod : std::uint32_t {
 enum class ConfigMethod : std::uint32_t {
     kGet = 1,
     kSet = 2,
+};
+
+enum class CalibrationMethod : std::uint32_t {
+    /** Empty request. Response: JSON state {state, version, serial, staged}. */
+    kGetState = 1,
+    /** Request: JSON CalibrationPackage string. Response: JSON {accepted, errors[]}. */
+    kDownloadParams = 2,
+    /** Empty request. Writes joint zero to EEPROM and reads back. Response: JSON {verified, joints[], crc_ok}. */
+    kReadbackVerify = 3,
+    /** Empty request. Atomically activates the staged controller-side parameters. */
+    kCommit = 4,
+    /** Empty request. Discards the staged parameters and returns to IDLE. */
+    kRollback = 5,
+    /** Empty request. Response: JSON string of the currently active calibration package. */
+    kReadCurrent = 6,
 };
 
 }  // namespace robot::platform::tcp_data
