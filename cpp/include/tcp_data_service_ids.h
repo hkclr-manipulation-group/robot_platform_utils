@@ -98,15 +98,15 @@ enum class ConfigMethod : std::uint32_t {
 enum class CalibrationMethod : std::uint32_t {
     /** Empty request. Response: JSON state {state, version, serial, staged}. */
     kGetState = 1,
-    /** Request: JSON CalibrationPackage string. Response: JSON {accepted, errors[]}. */
+    /** Request: JSON CalibrationPackage string. Response: {accepted, version, restart_required}. */
     kDownloadParams = 2,
-    /** Empty request. Writes joint zero to EEPROM and reads back. Response: JSON {verified, joints[], crc_ok}. */
+    /** Empty request. Verifies the controller file. EEPROM writes require future maintenance mode. */
     kReadbackVerify = 3,
-    /** Empty request. Atomically activates the staged controller-side parameters. */
+    /** Empty request. Atomically persists controller parameters; applies after restart. */
     kCommit = 4,
-    /** Empty request. Discards the staged parameters and returns to IDLE. */
+    /** Empty request. Discards staging; retains any committed calibration. */
     kRollback = 5,
-    /** Empty request. Response: JSON string of the currently active calibration package. */
+    /** Empty request. Response: persisted calibration JSON, possibly awaiting restart. */
     kReadCurrent = 6,
 };
 
