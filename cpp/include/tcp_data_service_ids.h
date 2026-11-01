@@ -17,7 +17,7 @@ constexpr size_t kRpcSessionAuthSize = sizeof(std::uint16_t) + sizeof(std::uint3
 
 enum class ServiceId : std::uint32_t {
     kStorage = 1,
-    /** Reserved; not registered on rt_control server. */
+    /** Versioned frozen teaching trajectory export (optional on older RTs). */
     kTeach = 2,
     kLog = 3,
     kSystem = 4,
