@@ -779,6 +779,7 @@ namespace robot::platform::serialization {
     }
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkCommandReq& value) {
+        value.internal_v2_command_id = 0;
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);

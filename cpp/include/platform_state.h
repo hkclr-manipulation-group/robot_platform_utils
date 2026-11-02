@@ -392,6 +392,8 @@ namespace robot::platform {
     };
 
     struct SdkCommandReq{
+        // Internal planner-adapter identity only. NEVER serialized on Legacy UDP.
+        std::uint64_t internal_v2_command_id = 0;
         // --- Header / Metadata ---
         uint32_t magic_header = MAGIC_HEADER;   //Prevent mis-interpretation of random data as valid command
         uint16_t client_id;

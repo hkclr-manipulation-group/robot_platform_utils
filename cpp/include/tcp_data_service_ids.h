@@ -27,6 +27,8 @@ enum class ServiceId : std::uint32_t {
     kRuntimeSettings = 7,
     /** Versioned fault/recovery operations; existing UDP layouts unchanged. */
     kRecovery = 8,
+    /** Read-only version/capability/topology negotiation; Legacy motion unchanged. */
+    kProtocol = 9,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */

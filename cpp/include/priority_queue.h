@@ -2,6 +2,7 @@
 #define PRIORITY_QUEUE_H
 
 #include <queue>
+#include <cstdint>
 #include <chrono>
 #include <vector>
 #include <memory>
@@ -16,7 +17,7 @@ namespace robot::platform {
                 int id = -1;
                 int priority = 0;
                 uint64_t seq = 0;
-                long received_at = 0;
+                int64_t received_at = 0;
                 T data;
             };
 
