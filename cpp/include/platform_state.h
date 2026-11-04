@@ -365,6 +365,14 @@ namespace robot::platform {
         float qw, qx, qy, qz; //Quaternion
     };
 
+    enum class ArmTargetKind : uint8_t { Legacy = 0, JointPosition = 1, CartesianPose = 2, CartesianLine = 3 };
+    struct TypedArmTarget {
+        ArmTargetKind kind = ArmTargetKind::Legacy;
+        uint8_t joint_count = 0;
+        float joints[MAX_ARM_JOINT_SIZE]{};
+        CartesianTarget pose{}; // Model base -> configured TCP, m and wxyz.
+    };
+
     struct SinglePointTarget{
         float               interpolation_t; // Position moves: 0 selects speed mode; >0 requests a duration (may only extend).
         float               interpolation_speed_ratio; // Position moves: peak-velocity cap as (0,1] or legacy % (>1 clamped). Applies in speed mode (t=0) and as ceiling during timed moves (t>0).
@@ -389,7 +397,26 @@ namespace robot::platform {
             */
             JogCommand          arm_cartesian_jog[MAX_ARM_SIZE][6];
         };
+        // Internal only, NEVER serialized on Legacy. Independent storage per arm.
+        TypedArmTarget typed_arm[MAX_ARM_SIZE]{};
     };
+
+    using JointTargetValues = float[MAX_ARM_JOINT_SIZE];
+    inline const JointTargetValues& jointTarget(const SinglePointTarget& t, int arm) {
+        return t.typed_arm[arm].kind==ArmTargetKind::Legacy ? t.arm_joint[arm] : t.typed_arm[arm].joints;
+    }
+    inline const CartesianTarget& cartesianTarget(const SinglePointTarget& t, int arm) {
+        return t.typed_arm[arm].kind==ArmTargetKind::Legacy ? t.arm_tool_cartesian[arm] : t.typed_arm[arm].pose;
+    }
+    inline bool legacyMixedSpaces(const ControlStrategy* strategies, int count) {
+        if (count<0 || count>MAX_ARM_SIZE) return true;
+        bool joint=false, cart=false;
+        for (int a=0;a<count;++a) {
+            const bool c=strategies[a]==ControlStrategy::kCartesian || strategies[a]==ControlStrategy::kCartesianLine;
+            cart |= c; joint |= !c;
+        }
+        return joint && cart;
+    }
 
     struct SdkCommandReq{
         // Internal planner-adapter identity only. NEVER serialized on Legacy UDP.
