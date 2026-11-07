@@ -54,10 +54,12 @@ enum class StorageMethod : std::uint32_t {
 };
 
 enum class SystemMethod : std::uint32_t {
+    /** Read-only physical-button encoder baseline progress (schema 1). */
+    kGetEncoderBaselineStatus = 13,
     kGetCapabilities = 1,
     kGetVersion = 2,
-    /** Re-baseline encoder_last_position.bin from current joint readings. Request body empty. */
-    kResetEncoderLastPosition = 3,
+    // Method 3 (remote encoder re-baseline) is retired: baseline confirmation only
+    // happens through the physical recovery button. Do not reuse the id.
     /** Request body empty. Response: encoded serial string (may be empty). */
     kGetArmSerialNumber = 4,
     /** Request body: encoded serial string. Response empty on success. */

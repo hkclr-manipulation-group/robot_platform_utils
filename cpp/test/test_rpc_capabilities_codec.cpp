@@ -26,7 +26,6 @@ std::vector<RpcServiceCapability> buildRtControlCapabilities() {
         {static_cast<std::uint32_t>(ServiceId::kSystem),
          {static_cast<std::uint32_t>(SystemMethod::kGetCapabilities),
           static_cast<std::uint32_t>(SystemMethod::kGetVersion),
-          static_cast<std::uint32_t>(SystemMethod::kResetEncoderLastPosition),
           static_cast<std::uint32_t>(SystemMethod::kGetArmSerialNumber),
           static_cast<std::uint32_t>(SystemMethod::kSetArmSerialNumber),
           static_cast<std::uint32_t>(SystemMethod::kFlushRuntimeConfig)}},

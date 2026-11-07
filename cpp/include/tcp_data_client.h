@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "encoder_baseline_protocol.h"
 #include "tcp_data_protocol.h"
 #include "tcp_data_services.h"
 
@@ -91,8 +92,12 @@ public:
     Result setConfig(tcp_data::RtConfigType type, const std::vector<std::int32_t>& values,
                      tcp_data::ConfigValuePayload& result, int timeout_usec = kDefaultTimeoutUsec);
 
-    /** Re-baseline encoder_last_position.bin (requires Recovery system state). */
-    Result resetEncoderLastPosition(int timeout_usec = kDefaultTimeoutUsec);
+    /**
+     * Read physical-button encoder baseline progress (System schema 1, read-only).
+     * Controllers predating method 13 answer 404 and return ok=false.
+     */
+    Result getEncoderBaselineStatus(tcp_data::encoder_baseline::State& state,
+                                    int timeout_usec = kDefaultTimeoutUsec);
 
     /** Read persisted arm serial number (empty string when unset). */
     Result getArmSerialNumber(std::string& out_serial, int timeout_usec = kDefaultTimeoutUsec);
