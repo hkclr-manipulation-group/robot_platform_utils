@@ -228,20 +228,7 @@ ArmForceControlConfig parseArmForceControlConfig(
             impedance["torque_saturation"],
             context + ".joint_impedance.torque_saturation");
     }
-    if (node["velocity_low_pass_filter_ratio"]) {
-        force_control.velocity_low_pass_filter_ratio = readFloatVector(
-            node["velocity_low_pass_filter_ratio"],
-            context + ".velocity_low_pass_filter_ratio");
-    }
-    if (node["friction"]) {
-        const YAML::Node friction = node["friction"]["coulumb_with_viscous"];
-        force_control.friction.coulumb_with_viscous.ratio =
-            readFloatVector(friction["ratio"], context + ".friction.coulumb_with_viscous.ratio");
-        force_control.friction.coulumb_with_viscous.coulumb =
-            readFloatVector(friction["coulumb"], context + ".friction.coulumb_with_viscous.coulumb");
-        force_control.friction.coulumb_with_viscous.viscous =
-            readFloatVector(friction["viscous"], context + ".friction.coulumb_with_viscous.viscous");
-    }
+    // Legacy friction/filter fields are deliberately ignored during migration.
     return force_control;
 }
 
@@ -304,6 +291,15 @@ ArmConfig parseArmConfig(
     if (node["force_control"]) {
         arm.force_control = parseArmForceControlConfig(
             node["force_control"], context + ".force_control");
+        const auto friction = node["force_control"]["friction"];
+        if (friction && friction["enabled"]) {
+            arm.drag_friction.enabled = readScalar<bool>(friction["enabled"], context + ".friction.enabled");
+            if (friction["config_file"])
+                arm.drag_friction.config_file = readScalar<std::string>(friction["config_file"], context + ".friction.config_file");
+            if (arm.drag_friction.enabled && ((arm.type != "Spark2_V2" && arm.type != "Spark2_V2_2") || arm.joint_size != 6 ||
+                                               arm.drag_friction.config_file.empty()))
+                throw YamlConfigParseError("Drag friction requires a six-axis Spark2_V2 and config_file");
+        }
     }
     return arm;
 }

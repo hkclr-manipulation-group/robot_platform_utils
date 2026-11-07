@@ -60,21 +60,15 @@ struct ArmJointImpedanceConfig {
     std::vector<float> torque_saturation;
 };
 
-struct ArmFrictionCoulombViscousConfig {
-    std::vector<float> ratio;
-    std::vector<float> coulumb;
-    std::vector<float> viscous;
-};
-
-struct ArmFrictionConfig {
-    ArmFrictionCoulombViscousConfig coulumb_with_viscous;
+// Factory-only profile reference. Runtime force settings cannot override it.
+struct ArmDragFrictionConfig {
+    bool enabled = false;
+    std::string config_file;
 };
 
 struct ArmForceControlConfig {
     ArmGravityControlConfig gravity;
     ArmJointImpedanceConfig joint_impedance;
-    std::vector<float> velocity_low_pass_filter_ratio;
-    ArmFrictionConfig friction;
 };
 
 struct ArmSafetyConfig {
@@ -95,6 +89,7 @@ struct ArmConfig {
     std::optional<ArmPidConfig> pid;
     std::optional<ArmSafetyConfig> safety;
     std::optional<ArmForceControlConfig> force_control;
+    ArmDragFrictionConfig drag_friction;
 };
 
 struct GripperConfig {
