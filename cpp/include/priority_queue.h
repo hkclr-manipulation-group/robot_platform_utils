@@ -35,6 +35,7 @@ namespace robot::platform {
 
             void push(std::unique_ptr<QueueData> data);
             std::unique_ptr<QueueData> pop();
+            const QueueData* peek() const { return queue_.empty() ? nullptr : queue_.front().get(); }
             bool empty() const;
             void clear();
             size_t size() const;
