@@ -402,8 +402,11 @@ namespace robot::platform {
     };
 
     using JointTargetValues = float[MAX_ARM_JOINT_SIZE];
+    // Separate returns: a conditional expression would decay both array operands
+    // to float* and could not bind to the array reference.
     inline const JointTargetValues& jointTarget(const SinglePointTarget& t, int arm) {
-        return t.typed_arm[arm].kind==ArmTargetKind::Legacy ? t.arm_joint[arm] : t.typed_arm[arm].joints;
+        if (t.typed_arm[arm].kind==ArmTargetKind::Legacy) return t.arm_joint[arm];
+        return t.typed_arm[arm].joints;
     }
     inline const CartesianTarget& cartesianTarget(const SinglePointTarget& t, int arm) {
         return t.typed_arm[arm].kind==ArmTargetKind::Legacy ? t.arm_tool_cartesian[arm] : t.typed_arm[arm].pose;
