@@ -246,6 +246,17 @@ namespace robot::platform::serialization {
     }
 
     bool toBytes(const SdkCommandReq& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size) {
+        if (legacyMixedSpaces(value.payload.activated_control_strategy,value.payload.arm_size)) return false;
+        for (int k=0;k<MAX_WAYPOINTS;++k)
+        {
+            for (int a=0;a<MAX_ARM_SIZE;++a)
+            {
+                if (value.payload.target[k].typed_arm[a].kind!=ArmTargetKind::Legacy)
+                    return false;
+            }
+
+        }
+
         std::uint8_t* cursor = buffer;
         std::size_t remaining = buffer_size;
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
@@ -780,6 +791,7 @@ namespace robot::platform::serialization {
 
     bool fromBytes(const std::uint8_t* buffer, std::size_t buffer_size, SdkCommandReq& value) {
         value.internal_v2_command_id = 0;
+        for (auto& point:value.payload.target) for (auto& arm:point.typed_arm) arm=TypedArmTarget{};
         std::vector<std::pair<std::string, std::uint8_t>> write_phase;
         const std::uint8_t* cursor = buffer;
         readRaw(cursor, value.magic_header);
@@ -803,6 +815,7 @@ namespace robot::platform::serialization {
             readEnum(cursor, value.payload.activated_control_strategy[i]);
         }
         readEnum(cursor, value.payload.teaching_cmd);
+        if (legacyMixedSpaces(value.payload.activated_control_strategy,value.payload.arm_size)) return false;
         readRaw(cursor, value.payload.enable_jog);
         readRaw(cursor, value.payload.target_count);
         for (uint32_t i = 0; i < value.payload.target_count; ++i) {

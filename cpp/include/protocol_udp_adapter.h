@@ -2,6 +2,7 @@
 #include "protocol_udp.h"
 #include "protocol_v2_service.h"
 #include "platform_state.h"
+#include <algorithm>
 
 namespace robot::platform::protocol_udp {
 // Hash semantic configuration fields only, never native struct padding or request metadata.
@@ -33,12 +34,21 @@ inline std::uint64_t configurationRevision(const SdkConfigReq& config) {
             putFloat(bytes, p.gripper[g].soft_limit_position[j][1]);
         }
     }
+    // Preserve the existing Joint-only revision. Cartesian commands additionally
+    // bind the configured TCP; changing it must invalidate prepared operations.
+    if (std::any_of(p.arm,p.arm+p.arm_size,[](const auto& a) {
+            return a.control_strategy==ControlStrategy::kCartesian || a.control_strategy==ControlStrategy::kCartesianLine; })) {
+        bytes.put(std::uint32_t(0x43545031));
+        for (int a=0;a<p.arm_size;++a) {
+            putFloat(bytes,p.arm[a].tool_offset.x); putFloat(bytes,p.arm[a].tool_offset.y); putFloat(bytes,p.arm[a].tool_offset.z);
+        }
+    }
     std::uint64_t hash = 14695981039346656037ull;
     for (auto b : bytes.data) hash = (hash ^ b) * 1099511628211ull;
     return hash ? hash : 1;
 }
 // Validate the entire atomic arm group before touching output. No gripper motion,
-// mixed modes or omitted arms in this first motion schema.
+// omitted arms; typed targets keep mixed planning spaces out of the Legacy union.
 inline bool adapt(const Packet& packet, const SdkConfigReq& config, const SrvState& state, SdkCommandReq& out) {
     if (!valid(packet.command) || packet.command.targets.size() != config.payload.arm_size ||
         !configurationRevision(config)) return false;
@@ -54,21 +64,38 @@ inline bool adapt(const Packet& packet, const SdkConfigReq& config, const SrvSta
     target.interpolation_speed_ratio = packet.command.velocity_scale;
     for (int a = 0; a < config.payload.arm_size; ++a) {
         const auto& arm = config.payload.arm[a];
-        if (arm.control_strategy != ControlStrategy::kJoint || arm.target_type != ControlType::kPosition ||
+        if ((arm.control_strategy != ControlStrategy::kJoint && arm.control_strategy != ControlStrategy::kCartesian &&
+             arm.control_strategy != ControlStrategy::kCartesianLine) || arm.target_type != ControlType::kPosition ||
             (arm.actuator_mode != ControlType::kPosition && arm.actuator_mode != ControlType::kVelocity) ||
             (arm.filter_type != SmoothingMethod::kCos && arm.filter_type != SmoothingMethod::kLinear &&
              arm.filter_type != SmoothingMethod::kCubic && arm.filter_type != SmoothingMethod::kQuintic)) return false;
         const Target* selected = nullptr;
         for (const auto& t : packet.command.targets) if (t.component == std::uint32_t(a + 1)) selected = &t;
         const auto count = config.payload.arm_joint_size[a];
-        if (!selected || selected->radians.size() != count) return false;
+        const auto expected=arm.control_strategy==ControlStrategy::kJoint ? 1u : arm.control_strategy==ControlStrategy::kCartesian ? 2u : 3u;
+        if (!selected || selected->type!=expected || (expected==1 && selected->radians.size()!=count)) return false;
+        // Mixed-space first release uses a common physical Position mode.
+        const bool mixed=std::any_of(config.payload.arm,config.payload.arm+config.payload.arm_size,
+                [](const auto& x) { return x.control_strategy!=ControlStrategy::kJoint; });
+        if (mixed && config.payload.arm_size<2) return false;
+        if (mixed && arm.actuator_mode!=ControlType::kPosition) return false;
         command.payload.arm_joint_size[a] = count;
-        command.payload.activated_control_strategy[a] = ControlStrategy::kJoint;
+        command.payload.activated_control_strategy[a] = arm.control_strategy;
+        auto& typed=target.typed_arm[a];
+        if (mixed) {
+            typed.kind=static_cast<ArmTargetKind>(expected); typed.joint_count=count;
+        }
+        if (expected!=1) {
+            typed.pose={selected->pose[0],selected->pose[1],selected->pose[2],selected->pose[3],
+                selected->pose[4],selected->pose[5],selected->pose[6]};
+            continue;
+        }
         for (int j = 0; j < count; ++j) {
             const auto q = selected->radians[j];
             const auto lo = arm.soft_limit_position[j][0], hi = arm.soft_limit_position[j][1];
             if (!std::isfinite(lo) || !std::isfinite(hi) || lo > hi || q < lo || q > hi) return false;
-            target.arm_joint[a][j] = q;
+            if (mixed) typed.joints[j]=q;
+            else target.arm_joint[a][j] = q;
         }
     }
     for (int g = 0; g < config.payload.gripper_size; ++g) {

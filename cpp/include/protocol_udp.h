@@ -3,6 +3,7 @@
 #include "platform_crypto.h"
 #include <cmath>
 #include <cstring>
+#include <array>
 
 namespace robot::platform::protocol_udp {
 namespace base = protocol_v2;
@@ -10,6 +11,8 @@ constexpr std::uint32_t kMagic = 0x32555253; // SRU2, distinct from Legacy and T
 constexpr std::size_t kHeaderSize = 80, kTagSize = 16, kMaxDatagram = 1200;
 constexpr std::uint64_t kJointPosition = 1ull << 8, kOperationStatus = 1ull << 9;
 constexpr std::uint64_t kFeatures = kJointPosition | kOperationStatus;
+constexpr std::uint64_t kCartesianPose = 1ull << 10, kCartesianLine = 1ull << 11, kMixedSpace = 1ull << 12;
+constexpr std::uint64_t kMixedFeatures = kFeatures | kCartesianPose | kCartesianLine | kMixedSpace;
 enum class Kind : std::uint16_t { Submit = 1, Query = 2, Status = 3 };
 enum class Phase : std::uint16_t { Received = 1, Accepted = 2, Running = 3, Succeeded = 4,
     Failed = 5, Superseded = 6, Expired = 7, Unknown = 8 };
@@ -21,7 +24,11 @@ struct Context {
     std::uint64_t command = 0, boot_high = 0, boot_low = 0, topology = 0, configuration = 0, issued_us = 0;
     std::uint32_t ttl_ms = 1000;
 };
-struct Target { std::uint32_t component = 0; std::vector<float> radians; };
+struct Target {
+    std::uint32_t component = 0; std::vector<float> radians;
+    std::uint16_t type = 1, frame = 0; // 1=Joint, 2=Cartesian pose, 3=Cartesian line; frame 0=model base/configured TCP.
+    std::array<float,7> pose{}; // x,y,z in m, then unit quaternion w,x,y,z.
+};
 struct Command {
     // 0=speed-limited, 1=timed with independent velocity ceiling.
     std::uint16_t timing = 0;
@@ -45,8 +52,16 @@ inline bool valid(const Command& c) {
         c.targets.empty() || c.targets.size() > base::kMaxComponents) return false;
     for (std::size_t i = 0; i < c.targets.size(); ++i) {
         const auto& t = c.targets[i];
-        if (!t.component || t.radians.empty() || t.radians.size() > base::kMaxJoints) return false;
-        for (float q : t.radians) if (!std::isfinite(q)) return false;
+        if (!t.component || t.type<1 || t.type>3 || t.frame) return false;
+        if (t.type==1) {
+            if (t.radians.empty() || t.radians.size()>base::kMaxJoints) return false;
+            for (float q:t.radians) if (!std::isfinite(q)) return false;
+        } else {
+            if (!t.radians.empty()) return false;
+            for (float v:t.pose) if (!std::isfinite(v)) return false;
+            double norm=0; for (int j=3;j<7;++j) norm+=double(t.pose[j])*t.pose[j];
+            if (std::abs(norm-1)>1e-3) return false;
+        }
         for (std::size_t j = 0; j < i; ++j) if (c.targets[j].component == t.component) return false;
     }
     return true;
@@ -71,8 +86,12 @@ inline bool encode(const Packet& p, std::vector<std::uint8_t>& out) {
             !putFloat(timing, p.command.velocity_scale) || !putFloat(timing, p.command.duration_sec) || !body.field(1, timing)) return false;
         for (const auto& t : p.command.targets) {
             base::Writer target;
-            if (!target.put(t.component) || !target.put(std::uint16_t(1)) || !target.put(std::uint16_t(t.radians.size()))) return false;
-            for (float q : t.radians) if (!putFloat(target, q)) return false;
+            if (!target.put(t.component) || !target.put(t.type) || !target.put(std::uint16_t(t.type==1?t.radians.size():7))) return false;
+            if (t.type==1) { for (float q:t.radians) if (!putFloat(target,q)) return false; }
+            else {
+                if (!target.put(t.frame) || !target.put(std::uint16_t(0))) return false;
+                for (float v:t.pose) if (!putFloat(target,v)) return false;
+            }
             if (!body.field(20, target)) return false;
         }
     } else if (p.kind == Kind::Status) {
@@ -113,11 +132,16 @@ inline bool decode(const std::uint8_t* data, std::size_t size, Packet& out) {
                     !getFloat(value, p.command.velocity_scale) || !getFloat(value, p.command.duration_sec)) return false;
                 timing_seen = true;
             } else if (f.tag == 20) {
-                Target t; std::uint16_t type, count;
-                if (p.command.targets.size() >= base::kMaxComponents || !value.get(t.component) || !value.get(type) ||
-                    !value.get(count) || type != 1 || !count || count > base::kMaxJoints || value.remaining() != 4u * count) return false;
-                t.radians.resize(count);
-                for (auto& q : t.radians) if (!getFloat(value, q)) return false;
+                Target t; std::uint16_t count, target_reserved;
+                if (p.command.targets.size()>=base::kMaxComponents || !value.get(t.component) || !value.get(t.type) ||
+                    !value.get(count) || t.type<1 || t.type>3 || !count || count>base::kMaxJoints) return false;
+                if (t.type==1) {
+                    if (value.remaining()!=4u*count) return false;
+                    t.radians.resize(count); for (auto& q:t.radians) if (!getFloat(value,q)) return false;
+                } else {
+                    if (count!=7 || !value.get(t.frame) || !value.get(target_reserved) || target_reserved || t.frame || value.remaining()!=28) return false;
+                    for (auto& v:t.pose) if (!getFloat(value,v)) return false;
+                }
                 p.command.targets.push_back(std::move(t));
             } else if (f.flags & base::kCritical) return false;
         }
