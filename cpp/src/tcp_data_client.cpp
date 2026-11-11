@@ -594,9 +594,29 @@ TcpDataClient::Result TcpDataClient::getCapabilities(std::vector<std::uint8_t>& 
     return rpc;
 }
 
-TcpDataClient::Result TcpDataClient::resetEncoderLastPosition(int timeout_usec) {
-    return callRpc(tcp_data::ServiceId::kSystem,
-                   static_cast<std::uint32_t>(tcp_data::SystemMethod::kResetEncoderLastPosition), {}, timeout_usec);
+TcpDataClient::Result TcpDataClient::getEncoderBaselineStatus(tcp_data::encoder_baseline::State& state,
+                                                             int timeout_usec) {
+    if (timeout_usec <= 0) {
+        return Result{false, "TcpDataClient: invalid encoder baseline status timeout", 0};
+    }
+    Result rpc = callRpc(tcp_data::ServiceId::kSystem,
+                         static_cast<std::uint32_t>(tcp_data::SystemMethod::kGetEncoderBaselineStatus), {},
+                         timeout_usec);
+    if (!rpc.ok) {
+        return rpc;
+    }
+    if (rpc.status_code == 404) {
+        return Result{false, "TcpDataClient: controller does not support encoder baseline status", 404};
+    }
+    if (rpc.status_code != 0) {
+        return rpc;
+    }
+    tcp_data::encoder_baseline::State decoded;
+    if (!tcp_data::encoder_baseline::decode(rpc.response_body.data(), rpc.response_body.size(), decoded)) {
+        return Result{false, "TcpDataClient: failed to decode encoder baseline status", rpc.status_code};
+    }
+    state = decoded;
+    return Result{true, "ok", 0, {}};
 }
 
 TcpDataClient::Result TcpDataClient::getArmSerialNumber(std::string& out_serial, int timeout_usec) {

@@ -746,6 +746,9 @@ namespace robot::platform {
         float   arm_joint_vel[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
         float   arm_joint_cur[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
         float   arm_joint_tor[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
+        // Internal-only feedback, not part of the SDK wire payload. Zero timestamp = invalid.
+        float   arm_direct_vel[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE]{};
+        int64_t arm_direct_vel_sample_us[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE]{};
 
         //Gripper related
         int     gripper_size;
@@ -768,6 +771,8 @@ namespace robot::platform {
         uint8_t     arm_size;
         uint8_t     arm_joint_size[MAX_ARM_SIZE];
         float       arm_joint_target[MAX_ARM_SIZE][MAX_ARM_JOINT_SIZE];
+        // Internal-only, monotonic deadline of feedback used for friction; 0 = no friction.
+        int64_t     arm_friction_feedback_deadline_us[MAX_ARM_SIZE]{};
 
         bool        gripper_read_only = true;
         uint8_t     gripper_size;
