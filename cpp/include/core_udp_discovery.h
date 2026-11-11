@@ -36,13 +36,13 @@ struct DiscoveredServer {
  *
  * @param client_id         Panel / SDK client id (HMAC + session bookkeeping).
  * @param core_request_port Destination UDP port (same as CoreUdpServer local_port).
- * @param telemetry_port    Telemetry UDP port (same as CoreUdpServer telemetry port).
- * @param local_ack_port    Local bind port for the handshake reply (same as CoreUdpClient ack port).
+ * @param telemetry_port    Client telemetry UDP port; 0 queries discovery without subscribing.
+ * @param local_ack_port    Local reply bind port; 0 requests an exclusive OS-assigned port.
  * @param probe_ips         Unicast, multicast, and/or 255.255.255.255 targets.
  * @param timeout_ms        Per-attempt wait for SdkHandshakeRes.
  * @param max_attempts_per_probe Retries per probe IP before moving on.
  *
- * Closes its temporary socket before returning so CoreUdpClient can bind local_ack_port.
+ * Closes its temporary socket before returning. Persistent transport binds its own ports.
  */
 DiscoveredServer discoverRtServerViaHandshake(
     uint16_t client_id,
@@ -79,7 +79,8 @@ inline DiscoveredServer discoverRtServerViaHandshake(
  * (WiFi APs often block broadcast but allow direct unicast). Returns an empty
  * vector when none respond (does not throw).
  * Ignores loopback (127.0.0.1) replies and merges entries that share the same
- * session_id + robot_name so one rt_control is listed once.
+ * server IP so repeated replies from one address are listed once. Session tokens
+ * and factory-default robot names are not device identities.
  * Returns an empty vector when none respond (does not throw for "not found").
  */
 std::vector<DiscoveredServer> discoverAllRtServersViaHandshake(

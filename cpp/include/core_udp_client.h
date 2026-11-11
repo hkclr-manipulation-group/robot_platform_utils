@@ -49,6 +49,8 @@ namespace robot::platform {
             CoreResponseVariantPtr waitAck(uint16_t client_id, uint32_t sequence_id, float timeout_ms);
             void close();
             CommandResponseStatus getLastStatus() const;
+            int telemetryPort() const;
+            int localAckPort() const;
 
         private:
             void ackThreadTask(int ack_dt_us);
@@ -60,6 +62,7 @@ namespace robot::platform {
             std::size_t ack_buffer_size_;
             std::unique_ptr<udp_node> send_udp_node_ptr_;
             std::unique_ptr<udp_node> telemetry_udp_node_ptr_;
+            std::uint32_t server_ipv4_ = 0;
             std::atomic<bool> is_running_ = true;
 
             //Need for ack thread
@@ -68,7 +71,7 @@ namespace robot::platform {
             std::thread ack_thread_;
             CoreResponseVariantPtr ack_data_;
             int ack_dt_us_ = 0;
-            CommandResponseStatus last_status_ = CommandResponseStatus::kSuccess;
+            std::atomic<CommandResponseStatus> last_status_{CommandResponseStatus::kSuccess};
     };
 } // namespace robot::platform
 #endif
