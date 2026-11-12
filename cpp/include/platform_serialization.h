@@ -116,7 +116,9 @@ namespace robot::platform::serialization {
 
     template<typename T>
     bool packMessage(const T& value, std::uint8_t* buffer, std::size_t buffer_size, std::size_t& written_size, const std::string* (*get_hmac_key)(uint16_t client_id)){
-        std::size_t payload_size; 
+        written_size = 0;
+        if (!buffer || buffer_size < HMAC_KEY_SIZE || !get_hmac_key) return false;
+        std::size_t payload_size = 0;
         uint8_t hmac_output[HMAC_KEY_SIZE];
         uint16_t client_id;
         if (!getClientId(value, client_id)){
@@ -124,11 +126,12 @@ namespace robot::platform::serialization {
             return false;
         }
 
-        toBytes(value, buffer, buffer_size, payload_size);
+        const std::size_t payload_capacity = buffer_size - HMAC_KEY_SIZE;
+        if (!toBytes(value, buffer, payload_capacity, payload_size) || payload_size > payload_capacity) return false;
         
         //Add security HMAC to the buffer
         const std::string* key = get_hmac_key(client_id);
-        if (!key) {
+        if (!key || key->size() < HMAC_KEY_SIZE) {
             std::cout << "packMessage: HMAC key not found for client" << std::endl;
             std::cerr << "Failed client_id lookup: " << client_id << std::endl;
             return false;
