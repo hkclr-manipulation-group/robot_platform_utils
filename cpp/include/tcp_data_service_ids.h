@@ -54,6 +54,8 @@ enum class StorageMethod : std::uint32_t {
 };
 
 enum class SystemMethod : std::uint32_t {
+    /** Internal aggregate robot metadata, schema 1; empty request, raw UTF-8 JSON. */
+    kGetRobotInfo = 14,
     /** Read-only physical-button encoder baseline progress (schema 1). */
     kGetEncoderBaselineStatus = 13,
     kGetCapabilities = 1,
