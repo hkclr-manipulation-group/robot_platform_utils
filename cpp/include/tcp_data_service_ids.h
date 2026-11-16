@@ -29,6 +29,13 @@ enum class ServiceId : std::uint32_t {
     kRecovery = 8,
     /** Read-only version/capability/topology negotiation; Legacy motion unchanged. */
     kProtocol = 9,
+    kModelMaintenance = 10,
+};
+
+enum class ModelMaintenanceMethod : std::uint32_t {
+    kRequestPermission = 1, kGetPermission = 2, kPrepareActivation = 3, kGetOperation = 4,
+    kGetCalibrationBinding = 5, kUploadCalibration = 6, kGetCalibrationDeployment = 7,
+    kCommitCalibrationDeployment = 8, kDiscardCalibrationDeployment = 9,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */
