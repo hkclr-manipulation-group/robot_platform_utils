@@ -9,6 +9,7 @@ namespace {
 
 using robot::platform::tcp_data::ConfigMethod;
 using robot::platform::tcp_data::LogMethod;
+using robot::platform::tcp_data::ModelMaintenanceMethod;
 using robot::platform::tcp_data::NetworkMethod;
 using robot::platform::tcp_data::RpcServiceCapability;
 using robot::platform::tcp_data::RuntimeSettingsMethod;
@@ -39,6 +40,21 @@ std::vector<RpcServiceCapability> buildRtControlCapabilities() {
         {static_cast<std::uint32_t>(ServiceId::kConfig),
          {static_cast<std::uint32_t>(ConfigMethod::kGet),
           static_cast<std::uint32_t>(ConfigMethod::kSet)}},
+        {static_cast<std::uint32_t>(ServiceId::kModelMaintenance),
+         {static_cast<std::uint32_t>(ModelMaintenanceMethod::kRequestPermission),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kGetPermission),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kPrepareActivation),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kGetOperation),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kGetCalibrationBinding),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kUploadCalibration),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kGetCalibrationDeployment),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kCommitCalibrationDeployment),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kDiscardCalibrationDeployment),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kStageFirmware),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kQueueFirmwareForRestart),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kGetFirmwareJob),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kRequestFirmwarePermission),
+          static_cast<std::uint32_t>(ModelMaintenanceMethod::kGetFirmwarePermission)}},
         {static_cast<std::uint32_t>(ServiceId::kRuntimeSettings),
          {static_cast<std::uint32_t>(RuntimeSettingsMethod::kFlush),
           static_cast<std::uint32_t>(RuntimeSettingsMethod::kListProfiles),
@@ -71,6 +87,18 @@ int main() {
         return 1;
     }
 
+    // These are deployed wire IDs, independent of enum names. Renumbering a
+    // method would silently route an existing SDK to a different operation.
+    const std::vector<std::uint32_t> maintenance_ids{1,2,3,4,5,6,7,8,9,10,11,12,13,14};
+    bool maintenance_found = false;
+    for (const auto& service : decoded) if (service.service_id == 10) {
+        maintenance_found = service.method_ids == maintenance_ids;
+    }
+    if (!maintenance_found) {
+        std::cerr << "model/firmware maintenance wire IDs changed\n";
+        return 1;
+    }
+
     std::size_t total_methods = 0;
     for (std::size_t i = 0; i < expected.size(); ++i) {
         if (decoded[i].service_id != expected[i].service_id
@@ -81,8 +109,8 @@ int main() {
         total_methods += decoded[i].method_ids.size();
     }
 
-    if (total_methods != 24) {
-        std::cerr << "expected 24 registered methods, got " << total_methods << '\n';
+    if (total_methods != 38) {
+        std::cerr << "expected 38 fixture methods, got " << total_methods << '\n';
         return 1;
     }
 

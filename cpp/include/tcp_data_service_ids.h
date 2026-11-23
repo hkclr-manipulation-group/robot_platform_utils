@@ -32,10 +32,25 @@ enum class ServiceId : std::uint32_t {
     kModelMaintenance = 10,
 };
 
+/** Authenticated Service 10, UTF-8 JSON bodies; see maintenance_protocol.md.
+ * Append methods without renumbering existing IDs. Firmware and model grants
+ * are distinct. These methods do not change TCP v3 framing or motion layouts.
+ */
 enum class ModelMaintenanceMethod : std::uint32_t {
-    kRequestPermission = 1, kGetPermission = 2, kPrepareActivation = 3, kGetOperation = 4,
-    kGetCalibrationBinding = 5, kUploadCalibration = 6, kGetCalibrationDeployment = 7,
-    kCommitCalibrationDeployment = 8, kDiscardCalibrationDeployment = 9,
+    kRequestPermission = 1, 
+    kGetPermission = 2, 
+    kPrepareActivation = 3, 
+    kGetOperation = 4,
+    kGetCalibrationBinding = 5, 
+    kUploadCalibration = 6, 
+    kGetCalibrationDeployment = 7,
+    kCommitCalibrationDeployment = 8, 
+    kDiscardCalibrationDeployment = 9,
+    kStageFirmware = 10,
+    kQueueFirmwareForRestart = 11,
+    kGetFirmwareJob = 12,
+    kRequestFirmwarePermission = 13,
+    kGetFirmwarePermission = 14,
 };
 
 /** Mirrors robot::platform::NetworkConfigAction values. */
