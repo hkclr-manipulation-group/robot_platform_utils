@@ -55,7 +55,7 @@ void CuarmMessageHandler::get_scan_format(char* buffer) {
 
 template<typename T1, typename T2>
 void CuarmMessageHandler::scan_type(const char buffer[], int index, T1& destination) {
-    T2 tmp;
+    T2 tmp{};
     char fmt[10];
     get_scan_format<T2>(fmt);
     sscanf(&(buffer[index]), fmt, &tmp);

@@ -56,6 +56,7 @@ enum class PlanResult {
     kSuccess                    = 0,  // IK passed, time allocation valid, safe to execute
     kPoseNotReachable           = 1,  // Target 6D pose is physically outside the workspace
     kLinearPathFailed           = 2,  // Reachable target, but continuous linear path is blocked (Singularity / Joint Limit)
+    kTargetOutOfRange           = 3,  // Target joint pose or path violates separating_plane / workspace guard
 };
 
 namespace DiagnosticFlags {    
