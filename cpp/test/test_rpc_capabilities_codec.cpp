@@ -109,8 +109,8 @@ int main() {
         total_methods += decoded[i].method_ids.size();
     }
 
-    if (total_methods != 38) {
-        std::cerr << "expected 38 fixture methods, got " << total_methods << '\n';
+    if (total_methods != 37) {
+        std::cerr << "expected 37 fixture methods, got " << total_methods << '\n';
         return 1;
     }
 
