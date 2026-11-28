@@ -484,6 +484,20 @@ void CuarmMessageHandler::unpack_planner_state(PlannerState* state, char* receiv
             sscanf(&(receive_buffer[index = get_next_data_index(receive_buffer, index)]), "%u#", &(state->arm_joint_diagnostic_flags[arm_i][i]));
         }
     }
+    memset(state->move_l_base_valid, 0, sizeof(state->move_l_base_valid));
+    const char* next = strchr(receive_buffer + index, '#');
+    while (next) {
+        unsigned arm = 0;
+        float pose[7];
+        int consumed = 0;
+        if (sscanf(next + 1, "MOVEL_TCP#%u#%f#%f#%f#%f#%f#%f#%f#%n", &arm,
+                   &pose[0], &pose[1], &pose[2], &pose[3], &pose[4], &pose[5], &pose[6],
+                   &consumed) != 8 || consumed == 0 || arm >= state->ArmSize || arm >= MAX_ARM_SIZE) break;
+        memcpy(state->move_l_base_pose[arm], pose, sizeof(pose));
+        state->move_l_base_sequence[arm] = state->received_sequence_id;
+        state->move_l_base_valid[arm] = true;
+        next += consumed; // Point at the delimiter immediately before the next record.
+    }
 }
 
 void CuarmMessageHandler::pack_planner_state(PlannerState* state, char* send_buffer, int buffer_size){
@@ -618,6 +632,22 @@ void CuarmMessageHandler::pack_planner_state(PlannerState* state, char* send_buf
     for (int arm_i = 0; arm_i < state->ArmSize; arm_i++){
         for (int i = 0; i < state->JointSize[arm_i]; ++ i){
             sprintf(&(send_buffer[strlen(send_buffer)]), "%u#", state->arm_joint_diagnostic_flags[arm_i][i]);
+        }
+    }
+    if (state->setting_update_finished) return;
+    // Only origins belonging to this ACK are included.
+    for (unsigned arm = 0; arm < state->ArmSize; ++arm) {
+        if (!state->move_l_base_valid[arm] ||
+            state->move_l_base_sequence[arm] != state->received_sequence_id) continue;
+        const auto& pose = state->move_l_base_pose[arm];
+        const size_t offset = strlen(send_buffer);
+        const size_t remaining = buffer_size - offset;
+        const int written = snprintf(send_buffer + offset, remaining,
+            "MOVEL_TCP#%u#%.9g#%.9g#%.9g#%.9g#%.9g#%.9g#%.9g#", arm,
+            pose[0], pose[1], pose[2], pose[3], pose[4], pose[5], pose[6]);
+        if (written < 0 || static_cast<size_t>(written) >= remaining) {
+            send_buffer[offset] = '\0';
+            return;
         }
     }
 }

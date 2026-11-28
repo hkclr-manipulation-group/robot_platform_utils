@@ -163,6 +163,10 @@ struct PlannerState{
     float JointPose[MAX_ARM_SIZE][MAX_JOINT_SIZE][7];
     float EEPose[MAX_ARM_SIZE][7];
     float ToolPose[MAX_ARM_SIZE][7];
+    // TCP pose at the MoveL reference reset, independent of live ToolPose.
+    bool move_l_base_valid[MAX_ARM_SIZE]{};
+    uint32_t move_l_base_sequence[MAX_ARM_SIZE]{};
+    float move_l_base_pose[MAX_ARM_SIZE][7]{};
 
     float interpolated_target[MAX_ARM_SIZE][MAX_JOINT_SIZE];
 
@@ -199,6 +203,12 @@ struct PlannerState{
     uint32_t        arm_joint_diagnostic_flags[MAX_ARM_SIZE][MAX_JOINT_SIZE];
 
     ////////////for debug & internal use/////////////////////
+
+    float task_interpolated_target[MAX_ARM_SIZE][6];
+    float task_target_before_interpolation[MAX_ARM_SIZE][6];
+    float task_pose[MAX_ARM_SIZE][6];
+
+
     float FilteredMotorTor[MAX_ARM_SIZE][MAX_MOTOR_SIZE];
     float FilteredMotorTorKalman[MAX_ARM_SIZE][MAX_MOTOR_SIZE];
     float FilteredMotorTorEuro[MAX_ARM_SIZE][MAX_MOTOR_SIZE];
